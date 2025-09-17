@@ -68,7 +68,7 @@ function App() {
     <div className="h-screen relative" style={{backgroundColor: '#fdfdf1'}}>
       {/* Logo and title in top left */}
       <div className="absolute top-6 left-6 flex items-center gap-3 z-30">
-        <img src="/scout-favicon.svg" alt="Scout" className="w-8 h-8" />
+        <img src="/scout-favicon.svg" alt="Scout" className="w-6 h-6" />
         <h1 className="text-2xl font-light text-gray-800">Scout</h1>
       </div>
       
