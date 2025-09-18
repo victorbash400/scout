@@ -15,7 +15,7 @@ const ChatBubble: React.FC<ChatBubbleProps> = ({ role, content, timestamp, tool_
   if (role === 'user') {
     return (
       <div className="flex justify-end mb-8">
-        <div className="text-white rounded-3xl px-5 py-3 max-w-md shadow-sm" style={{backgroundColor: '#64756a'}}>
+        <div className="text-white rounded-3xl px-5 py-3 max-w-md shadow-sm" style={{backgroundColor: '#04331c'}}>
           <p className="text-sm leading-relaxed">{content}</p>
         </div>
       </div>

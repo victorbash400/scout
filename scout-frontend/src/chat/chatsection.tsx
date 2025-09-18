@@ -48,11 +48,13 @@ const ChatSection: React.FC<ChatSectionProps> = ({ messages, onSendMessage, isLo
             {isLoading && (
               <div className="mb-8">
                 <div className="flex items-center space-x-3">
-                  <div className="flex items-center space-x-1">
-                    <div className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-pulse"></div>
-                    <div className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-pulse" style={{ animationDelay: '0.2s' }}></div>
-                    <div className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-pulse" style={{ animationDelay: '0.4s' }}></div>
-                  </div>
+                  <div 
+                    className="w-3 h-3 rounded-full" 
+                    style={{
+                      backgroundColor: '#04331c',
+                      animation: 'pulse-scale 1.5s ease-in-out infinite'
+                    }}
+                  ></div>
                 </div>
               </div>
             )}
@@ -61,7 +63,7 @@ const ChatSection: React.FC<ChatSectionProps> = ({ messages, onSendMessage, isLo
       </div>
       
       {/* Floating bottom chat input */}
-      <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-white via-white to-transparent p-6">
+      <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-white via-white to-transparent p-6 pb-2">
         <div className="max-w-2xl mx-auto">
           <ChatInput onSendMessage={onSendMessage} disabled={isLoading} />
         </div>
