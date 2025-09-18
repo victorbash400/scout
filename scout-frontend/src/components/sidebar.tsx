@@ -15,7 +15,7 @@ const Sidebar: React.FC = () => {
         style={{backgroundColor: '#04331c'}}
       >
         <div className={`flex flex-col items-center py-4 transition-all duration-300 ease-in-out ${
-          isExpanded ? 'px-6' : 'px-4'
+          isExpanded ? 'px-6' : 'px-3'
         }`}>
           {/* New Chat */}
           <button 

@@ -9,6 +9,10 @@ interface Message {
   role: 'user' | 'assistant';
   content: string;
   timestamp: string;
+  tool_name?: string;
+  tool_use_id?: string;
+  content_block_index?: number;
+  tool_is_active?: boolean;
 }
 
 function App() {
@@ -16,7 +20,7 @@ function App() {
   const [isLoading, setIsLoading] = useState(false);
   const [hasStarted, setHasStarted] = useState(false);
 
-  const handleSendMessage = (content: string) => {
+  const handleSendMessage = async (content: string) => {
     // Add user message
     const userMessage: Message = {
       role: 'user',
@@ -28,17 +32,108 @@ function App() {
     setIsLoading(true);
     setHasStarted(true);
 
-    // Simulate AI response after a delay
-    setTimeout(() => {
-      const aiMessage: Message = {
-        role: 'assistant',
-        content: `I received your message: "${content}". This is a demo response from the AI assistant.`,
-        timestamp: new Date().toLocaleTimeString()
-      };
-      
-      setMessages(prev => [...prev, aiMessage]);
+    // Add empty assistant message that we'll update with streaming content
+    const aiMessage: Message = {
+      role: 'assistant',
+      content: '',
+      timestamp: new Date().toLocaleTimeString()
+    };
+    setMessages(prev => [...prev, aiMessage]);
+
+    try {
+      // Call the streaming backend planner agent
+      const response = await fetch('http://localhost:8000/api/chat/stream', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ message: content }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const reader = response.body?.getReader();
+      if (!reader) {
+        throw new Error('No response body');
+      }
+
+      const decoder = new TextDecoder();
+      let buffer = '';
+      let isFirstChunk = true;
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        if (isFirstChunk) {
+          setIsLoading(false);
+          isFirstChunk = false;
+        }
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || ''; // Keep the last incomplete line in buffer
+
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            const data = line.slice(6); // Remove 'data: ' prefix
+            if (data === '[DONE]') {
+              break;
+            }
+            
+            try {
+              const parsed = JSON.parse(data);
+              if (parsed.content) {
+                setMessages(prev => {
+                  const lastMessage = prev[prev.length - 1];
+                  if (lastMessage && lastMessage.role === 'assistant' && !lastMessage.tool_name) {
+                    return prev.map((msg, i) => i === prev.length - 1 ? { ...msg, content: msg.content + parsed.content } : msg);
+                  } else {
+                    const newMessage: Message = { role: 'assistant', content: parsed.content, timestamp: new Date().toLocaleTimeString() };
+                    return [...prev, newMessage];
+                  }
+                });
+              } else if (parsed.tool_start) {
+                const { tool_name, tool_use_id, content_block_index } = parsed.tool_start;
+                const toolMessage: Message = {
+                  role: 'assistant',
+                  content: '',
+                  tool_name,
+                  tool_use_id,
+                  content_block_index,
+                  tool_is_active: true,
+                  timestamp: new Date().toLocaleTimeString()
+                };
+                setMessages(prev => [...prev, toolMessage]);
+              } else if (parsed.tool_end) {
+                const { content_block_index } = parsed.tool_end;
+                setMessages(prev => prev.map(msg => {
+                  if (msg.content_block_index === content_block_index) {
+                    return { ...msg, tool_is_active: false };
+                  }
+                  return msg;
+                }));
+              }
+            } catch (e) {
+              console.warn('Failed to parse streaming data:', data);
+            }
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error calling planner agent:', error);
+      // Update the last message with error content
+      setMessages(prev => prev.map((msg, index) => {
+        if (index === prev.length - 1 && msg.role === 'assistant') {
+          return { ...msg, content: 'Sorry, I encountered an error. Please make sure the backend server is running.' };
+        }
+        return msg;
+      }));
+    } finally {
       setIsLoading(false);
-    }, 1500);
+    }
   };
 
   if (!hasStarted) {

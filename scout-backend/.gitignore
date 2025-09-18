@@ -14,6 +14,10 @@ ENV/
 .env.production
 .env.*.local
 
+# AWS Access Keys and Sensitive Files
+Scout_Agent_accessKeys.csv
+*.csv
+
 # Python
 __pycache__/
 *.py[cod]

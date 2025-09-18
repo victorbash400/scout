@@ -6,6 +6,9 @@ interface Message {
   role: 'user' | 'assistant';
   content: string;
   timestamp: string;
+  tool_name?: string;
+  tool_input?: any;
+  tool_is_active?: boolean;
 }
 
 interface ChatSectionProps {
@@ -36,6 +39,9 @@ const ChatSection: React.FC<ChatSectionProps> = ({ messages, onSendMessage, isLo
                 role={message.role}
                 content={message.content}
                 timestamp={message.timestamp}
+                tool_name={message.tool_name}
+                tool_input={message.tool_input}
+                tool_is_active={message.tool_is_active}
               />
             ))}
             
@@ -47,7 +53,6 @@ const ChatSection: React.FC<ChatSectionProps> = ({ messages, onSendMessage, isLo
                     <div className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-pulse" style={{ animationDelay: '0.2s' }}></div>
                     <div className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-pulse" style={{ animationDelay: '0.4s' }}></div>
                   </div>
-                  <span className="text-sm text-gray-500">AI is thinking...</span>
                 </div>
               </div>
             )}
