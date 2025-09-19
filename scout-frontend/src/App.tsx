@@ -1,9 +1,9 @@
-import { useState } from 'react'
-import './App.css'
-import ChatSection from './chat/chatsection'
-import ChatInput from './chat/chatinput'
-import Sidebar from './components/sidebar'
-import { getTimeBasedGreeting } from './data/greetings'
+import { useState } from 'react';
+import './App.css';
+import ChatSection from './chat/chatsection';
+import ChatInput from './chat/chatinput';
+import Sidebar from './components/sidebar';
+import { getTimeBasedGreeting } from './data/greetings';
 
 interface Message {
   role: 'user' | 'assistant';
@@ -13,6 +13,10 @@ interface Message {
   tool_use_id?: string;
   content_block_index?: number;
   tool_is_active?: boolean;
+  attachedFile?: {
+    name: string;
+    processed: boolean;
+  } | null;
 }
 
 function App() {
@@ -20,7 +24,16 @@ function App() {
   const [isLoading, setIsLoading] = useState(false);
   const [hasStarted, setHasStarted] = useState(false);
 
-  const uploadFile = async (file: File) => {
+  // New state for file handling
+  const [attachedFile, setAttachedFile] = useState<File | null>(null);
+  const [isProcessingFile, setIsProcessingFile] = useState(false);
+  const [fileContext, setFileContext] = useState<string | null>(null);
+
+  const handleFileAttach = async (file: File) => {
+    setAttachedFile(file);
+    setIsProcessingFile(true);
+    setFileContext(null); // Clear previous context
+
     const formData = new FormData();
     formData.append('file', file);
 
@@ -35,36 +48,58 @@ function App() {
       }
 
       const result = await response.json();
-      console.log('File uploaded successfully:', result.file_path);
-      return result.file_path;
+      if (result.content) {
+        setFileContext(result.content);
+        console.log('File processed and context set.');
+      } else {
+        console.log('File uploaded but no content processed (not a PDF).');
+      }
     } catch (error) {
-      console.error('Error uploading file:', error);
-      // Optionally, update the UI to show an error message
-      return null;
+      console.error('Error uploading or processing file:', error);
+      // Optionally, display an error to the user in the UI
+      setAttachedFile(null); // Clear the attachment on error
+    } finally {
+      setIsProcessingFile(false);
     }
   };
 
-  const handleSendMessage = async (content: string, file?: File) => {
-    setHasStarted(true);
+  const handleRemoveAttachment = async () => {
+    setAttachedFile(null);
+    setFileContext(null);
+    try {
+      await fetch('http://localhost:8000/api/context/clear', { method: 'POST' });
+      console.log('Backend context cleared.');
+    } catch (error) {
+      console.error('Failed to clear backend context:', error);
+    }
+  };
+
+  const handleSendMessage = async (content: string) => {
+    if (!hasStarted) {
+      setHasStarted(true);
+    }
+    
     setIsLoading(true);
 
-    let fileInfo = '';
-    if (file) {
-      const uploadedFilePath = await uploadFile(file);
-      if (uploadedFilePath) {
-        fileInfo = `(Attached file: ${file.name}) `;
-      }
-    }
+    // For the message content, we don't need to include the file prefix since
+    // we're showing it visually in the chat bubble
+    let messageToSend = content;
 
-    const messageToSend = `${fileInfo}${content}`.trim();
-
-    // Add user message
+    // Add user message with file attachment info
     const userMessage: Message = {
       role: 'user',
       content: messageToSend,
       timestamp: new Date().toLocaleTimeString(),
+      attachedFile: attachedFile ? {
+        name: attachedFile.name,
+        processed: true
+      } : null
     };
     setMessages((prev) => [...prev, userMessage]);
+
+    // Clear the file attachment UI but keep backend context for multi-turn conversations
+    // Only clear the attachment UI, not the backend context
+    setAttachedFile(null);
 
     // Add empty assistant message that we'll update with streaming content
     const aiMessage: Message = {
@@ -81,7 +116,8 @@ function App() {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ message: messageToSend }),
+        // The backend will use the context set during the file upload
+        body: JSON.stringify({ message: content }),
       });
 
       if (!response.ok) {
@@ -174,6 +210,15 @@ function App() {
     }
   };
 
+  const chatInputProps = {
+    onSendMessage: handleSendMessage,
+    disabled: isLoading,
+    attachedFile: attachedFile,
+    isProcessingFile: isProcessingFile,
+    onFileAttach: handleFileAttach,
+    onRemoveAttachment: handleRemoveAttachment,
+  };
+
   if (!hasStarted) {
     // Welcome page with centered ChatInput
     return (
@@ -190,7 +235,7 @@ function App() {
             <p className="text-2xl text-gray-700 font-medium">{getTimeBasedGreeting()}</p>
           </div>
           
-          <ChatInput onSendMessage={handleSendMessage} disabled={isLoading} />
+          <ChatInput {...chatInputProps} />
         </div>
       </div>
     );
@@ -208,11 +253,15 @@ function App() {
       <Sidebar />
       <ChatSection 
         messages={messages}
-        onSendMessage={handleSendMessage}
         isLoading={isLoading}
+        onSendMessage={handleSendMessage}
+        attachedFile={attachedFile}
+        isProcessingFile={isProcessingFile}
+        onFileAttach={handleFileAttach}
+        onRemoveAttachment={handleRemoveAttachment}
       />
     </div>
   )
 }
 
-export default App
+export default App;

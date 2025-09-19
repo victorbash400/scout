@@ -12,9 +12,10 @@ import json
 from typing import List, Dict, Any, AsyncGenerator
 import logging
 from datetime import datetime
-from agents.planner_agent import chat_with_planner, chat_with_planner_streaming
+from agents.planner_agent import chat_with_planner, chat_with_planner_streaming, set_planner_context, clear_planner_context
 from config.settings import settings
 from storage.local import LocalStorage
+from utils.pdf_parser import extract_text_from_pdf
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -90,19 +91,42 @@ async def health_check():
 async def upload_file(file: UploadFile = File(...)):
     """
     Upload a file to the configured storage backend.
+    If the file is a PDF, its text content is extracted and set as context.
     """
     try:
         content = await file.read()
         file_path = storage_client.save_file(file.filename, content)
         
+        extracted_content = None
+        if file.content_type == 'application/pdf':
+            logger.info(f"Processing uploaded PDF: {file.filename}")
+            extracted_content = extract_text_from_pdf(content)
+            if extracted_content:
+                set_planner_context(extracted_content)
+                logger.info(f"Extracted and set context from {file.filename}")
+            else:
+                logger.warning(f"Could not extract text from PDF: {file.filename}")
+
         return {
             "message": "File uploaded successfully",
-            "file_path": file_path
+            "file_path": file_path,
+            "content": extracted_content
         }
     
     except Exception as e:
         logger.error(f"Error uploading file: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error processing file: {str(e)}")
+
+@app.post("/api/context/clear")
+async def clear_context():
+    """Clears the document context from the planner agent."""
+    try:
+        clear_planner_context()
+        logger.info("Document context cleared.")
+        return {"message": "Context cleared successfully"}
+    except Exception as e:
+        logger.error(f"Error clearing context: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to clear context")
 
 # Get analysis status endpoint
 @app.get("/api/analysis/{analysis_id}/status")

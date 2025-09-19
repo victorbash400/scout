@@ -1,28 +1,41 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Settings2, MessageCircleMore, SquareMousePointer, Paperclip, X } from 'lucide-react';
+import { Settings2, MessageCircleMore, SquareMousePointer, Paperclip } from 'lucide-react';
+import AttachedFileIndicator from '../components/AttachedFileIndicator';
 
 // Interface for the component's props
 interface ChatInputProps {
-  onSendMessage: (message: string, file?: File) => void;
+  onSendMessage: (message: string) => void;
   disabled?: boolean;
+  attachedFile: File | null;
+  isProcessingFile: boolean;
+  onFileAttach: (file: File) => void;
+  onRemoveAttachment: () => void;
 }
 
 // Main ChatInput component
-const ChatInput: React.FC<ChatInputProps> = ({ onSendMessage, disabled = false }) => {
+const ChatInput: React.FC<ChatInputProps> = ({
+  onSendMessage,
+  disabled = false,
+  attachedFile,
+  isProcessingFile,
+  onFileAttach,
+  onRemoveAttachment,
+}) => {
   const [input, setInput] = useState('');
   const [mode, setMode] = useState<'chat' | 'agent'>('chat');
   const [showModeModal, setShowModeModal] = useState(false);
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Handles form submission to send a message
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if ((input.trim() || selectedFile) && !disabled) {
-      onSendMessage(input.trim(), selectedFile || undefined);
+    // A message can be sent if there's input text OR a file has been successfully processed.
+    if ((input.trim() || (attachedFile && !isProcessingFile)) && !disabled) {
+      onSendMessage(input.trim());
       setInput('');
-      setSelectedFile(null);
+      // The responsibility of clearing the attachment is now in the parent component (App.tsx)
+      // to ensure context is cleared after being used.
     }
   };
 
@@ -40,10 +53,14 @@ const ChatInput: React.FC<ChatInputProps> = ({ onSendMessage, disabled = false }
     setShowModeModal(false);
   };
 
-  // Handles file selection
+  // Handles file selection and immediately calls the attach handler
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
-      setSelectedFile(e.target.files[0]);
+      onFileAttach(e.target.files[0]);
+    }
+    // Reset the file input so the same file can be selected again
+    if(e.target) {
+      e.target.value = '';
     }
   };
 
@@ -92,17 +109,12 @@ const ChatInput: React.FC<ChatInputProps> = ({ onSendMessage, disabled = false }
         <div className="rounded-[22px] bg-white p-3 mt-4">
           <div className="flex items-end gap-2">
             <div className="flex-1">
-              {selectedFile && (
-                <div className="flex items-center justify-between bg-gray-100 rounded-lg px-3 py-2 mb-2 text-sm">
-                  <span className="text-gray-700 truncate">{selectedFile.name}</span>
-                  <button 
-                    type="button" 
-                    onClick={() => setSelectedFile(null)} 
-                    className="text-gray-500 hover:text-red-600"
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
-                </div>
+              {attachedFile && (
+                <AttachedFileIndicator
+                  fileName={attachedFile.name}
+                  isProcessing={isProcessingFile}
+                  onRemove={onRemoveAttachment}
+                />
               )}
               <textarea
                 value={input}
@@ -113,10 +125,10 @@ const ChatInput: React.FC<ChatInputProps> = ({ onSendMessage, disabled = false }
                   e.target.style.height = e.target.scrollHeight + 'px';
                 }}
                 onKeyPress={handleKeyPress}
-                placeholder="What do wanna do today?"
+                placeholder={attachedFile ? "File attached. Ask me anything about it..." : "What do wanna do today?"}
                 className="w-full bg-transparent text-gray-800 placeholder-gray-400 outline-none resize-none text-base pl-2 overflow-hidden"
                 rows={1}
-                disabled={disabled}
+                disabled={disabled || isProcessingFile}
                 style={{minHeight: '24px', maxHeight: '120px'}}
               />
               <div className="flex items-center gap-4 pl-2 mt-1">
@@ -125,8 +137,8 @@ const ChatInput: React.FC<ChatInputProps> = ({ onSendMessage, disabled = false }
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
                   </svg>
                 </button>
-                <input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" />
-                <button type="button" onClick={handleAttachClick} className="text-gray-500 hover:text-green-600" title="Attach File">
+                <input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" accept=".pdf" />
+                <button type="button" onClick={handleAttachClick} className="text-gray-500 hover:text-green-600" title="Attach File" disabled={isProcessingFile || !!attachedFile}>
                   <Paperclip className="w-5 h-5" />
                 </button>
                 <div className="relative" ref={dropdownRef}>
@@ -167,9 +179,9 @@ const ChatInput: React.FC<ChatInputProps> = ({ onSendMessage, disabled = false }
             </div>
             <button
               type="submit"
-              disabled={disabled || (!input.trim() && !selectedFile)}
+              disabled={disabled || isProcessingFile || (!input.trim() && !attachedFile)}
               className="w-10 h-10 rounded-full flex items-center justify-center transition-colors duration-200 disabled:bg-gray-300 disabled:cursor-not-allowed"
-              style={{backgroundColor: disabled || (!input.trim() && !selectedFile) ? '#d1d5db' : '#00311e'}}
+              style={{backgroundColor: (disabled || isProcessingFile || (!input.trim() && !attachedFile)) ? '#d1d5db' : '#00311e'}}
             >
               <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 10l7-7m0 0l7 7m-7-7v18" />

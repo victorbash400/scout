@@ -19,19 +19,34 @@ class PlannerAgent:
             system_prompt="""You are SCOUT, a concise business planning assistant. Keep answers short and helpful."""
         )
         self.session_memory = []  # In-session memory for chat history
+        self.document_context = None # For attached file context
         print(f"✅ Planner Agent initialized with {settings.bedrock_model_id}")
 
+    def _prepare_message_with_context(self, message: str) -> str:
+        """Prepend document context to the message if it exists."""
+        if self.document_context:
+            context_message = (
+                f"Please use the following document as context for your answer:\n"
+                f"<document>\n{self.document_context}\n</document>\n\n"
+                f"User question: {message}"
+            )
+            self.document_context = None  # Clear context after preparing the message
+            return context_message
+        return message
+
     def chat(self, message: str) -> str:
-        self.session_memory.append({"role": "user", "content": message})
-        response = self.agent(message)
+        message_with_context = self._prepare_message_with_context(message)
+        self.session_memory.append({"role": "user", "content": message}) # Log original message
+        response = self.agent(message_with_context)
         self.session_memory.append({"role": "assistant", "content": str(response.message)})
         return str(response.message)
 
     async def chat_streaming(self, message: str) -> AsyncGenerator[dict, None]:
-        self.session_memory.append({"role": "user", "content": message})
+        message_with_context = self._prepare_message_with_context(message)
+        self.session_memory.append({"role": "user", "content": message}) # Log original message
         full_response = []
         try:
-            async for event in self.agent.stream_async(message):
+            async for event in self.agent.stream_async(message_with_context):
                 yield event
                 if event.get('type') == 'content_delta':
                     full_response.append(event['delta']['text'])
@@ -40,6 +55,14 @@ class PlannerAgent:
             yield {"error": str(e)}
 
 planner = PlannerAgent()
+
+def set_planner_context(context: str):
+    """Sets the document context for the planner agent."""
+    planner.document_context = context
+
+def clear_planner_context():
+    """Clears the document context from the planner agent."""
+    planner.document_context = None
 
 def chat_with_planner(message: str) -> str:
     return planner.chat(message)
