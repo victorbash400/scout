@@ -12,7 +12,7 @@ import json
 from typing import List, Dict, Any, AsyncGenerator
 import logging
 from datetime import datetime
-from agents.planner_agent import chat_with_planner, chat_with_planner_streaming, set_planner_context, clear_planner_context
+from agents.planner_agent import chat_with_planner, chat_with_planner_streaming, set_planner_context, clear_planner_context, get_planner_todo_list, clear_planner_todo_list
 from config.settings import settings
 from storage.local import LocalStorage
 from utils.pdf_parser import extract_text_from_pdf
@@ -122,11 +122,23 @@ async def clear_context():
     """Clears the document context from the planner agent."""
     try:
         clear_planner_context()
-        logger.info("Document context cleared.")
-        return {"message": "Context cleared successfully"}
+        clear_planner_todo_list()  # Also clear the to-do list when clearing context
+        logger.info("Document context and to-do list cleared.")
+        return {"message": "Context and to-do list cleared successfully"}
     except Exception as e:
         logger.error(f"Error clearing context: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to clear context")
+
+# Get to-do list endpoint
+@app.get("/api/plan/todo")
+async def get_todo_list():
+    """Get the current to-do list from the planner agent."""
+    try:
+        todo_list = get_planner_todo_list()
+        return {"todo_list": todo_list}
+    except Exception as e:
+        logger.error(f"Error retrieving to-do list: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to retrieve to-do list")
 
 # Get analysis status endpoint
 @app.get("/api/analysis/{analysis_id}/status")
@@ -184,10 +196,15 @@ async def websocket_endpoint(websocket: WebSocket, analysis_id: str):
 async def chat_endpoint(request: Dict[str, str]):
     """Chat with the Planner Agent"""
     message = request.get("message", "")
+    mode = request.get("mode", "chat")  # Default to chat mode
     if not message:
         raise HTTPException(status_code=400, detail="Message required")
     
-    response = chat_with_planner(message)
+    # Prepend mode information to the message
+    mode_prefix = f"[MODE: {mode.upper()}] "
+    prefixed_message = mode_prefix + message
+    
+    response = chat_with_planner(prefixed_message)
     return {"response": response}
 
 # Streaming chat endpoint for Planner Agent
@@ -195,11 +212,16 @@ async def chat_endpoint(request: Dict[str, str]):
 async def chat_stream_endpoint(request: Dict[str, str]):
     """Stream chat with the Planner Agent"""
     message = request.get("message", "")
+    mode = request.get("mode", "chat")  # Default to chat mode
     if not message:
         raise HTTPException(status_code=400, detail="Message required")
     
+    # Prepend mode information to the message
+    mode_prefix = f"[MODE: {mode.upper()}] "
+    prefixed_message = mode_prefix + message
+    
     async def generate_stream() -> AsyncGenerator[str, None]:
-        async for event in chat_with_planner_streaming(message):
+        async for event in chat_with_planner_streaming(prefixed_message):
             if 'event' in event:
                 event_data = event['event']
                 if 'contentBlockStart' in event_data:

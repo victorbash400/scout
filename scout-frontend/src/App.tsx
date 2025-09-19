@@ -19,6 +19,14 @@ interface Message {
   } | null;
 }
 
+interface TodoList {
+  competition_tasks: string[];
+  market_tasks: string[];
+  financial_tasks: string[];
+  risk_tasks: string[];
+  synthesis_requirements: string[];
+}
+
 interface ChatSession {
   id: string;
   messages: Message[];
@@ -31,6 +39,9 @@ function App() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [hasStarted, setHasStarted] = useState(false);
+  const [mode, setMode] = useState<'chat' | 'agent'>('chat'); // Add mode state
+  const [todoList, setTodoList] = useState<TodoList | null>(null); // Add to-do list state
+  const [activeToolCalls, setActiveToolCalls] = useState<Set<string>>(new Set()); // Track active tool calls
 
   // New state for file handling
   const [attachedFile, setAttachedFile] = useState<File | null>(null);
@@ -115,6 +126,7 @@ function App() {
     setAttachedFile(null);
     setFileContext(null);
     setHasStarted(false);
+    setTodoList(null); // Clear to-do list
     
     // Clear backend context
     try {
@@ -135,6 +147,29 @@ function App() {
       createdAt: new Date()
     };
     setChatSessions(prev => [...prev, newSession]);
+  };
+
+  // Fetch to-do list from backend
+  const fetchTodoList = async () => {
+    try {
+      const response = await fetch('http://localhost:8000/api/plan/todo');
+      if (!response.ok) {
+        throw new Error('Failed to fetch to-do list');
+      }
+      const data = await response.json();
+      setTodoList(data.todo_list);
+    } catch (error) {
+      console.error('Error fetching to-do list:', error);
+    }
+  };
+
+  // Handle mode change
+  const handleModeChange = (newMode: 'chat' | 'agent') => {
+    setMode(newMode);
+    if (newMode === 'agent') {
+      // Fetch to-do list when switching to agent mode
+      fetchTodoList();
+    }
   };
 
   const handleSendMessage = async (content: string) => {
@@ -180,7 +215,7 @@ function App() {
           'Content-Type': 'application/json',
         },
         // The backend will use the context set during the file upload
-        body: JSON.stringify({ message: content }),
+        body: JSON.stringify({ message: content, mode: mode }),
       });
 
       if (!response.ok) {
@@ -213,6 +248,10 @@ function App() {
           if (line.startsWith('data: ')) {
             const data = line.slice(6); // Remove 'data: ' prefix
             if (data === '[DONE]') {
+              // Fetch updated to-do list when streaming is complete
+              if (mode === 'agent') {
+                fetchTodoList();
+              }
               break;
             }
             
@@ -240,16 +279,31 @@ function App() {
                   timestamp: new Date().toLocaleTimeString(),
                 };
                 setMessages((prev) => [...prev, toolMessage]);
+                
+                // Add to active tool calls
+                setActiveToolCalls(prev => new Set(prev).add(tool_use_id || ''));
               } else if (parsed.tool_end) {
-                const { content_block_index } = parsed.tool_end;
+                const { tool_use_id, content_block_index } = parsed.tool_end;
                 setMessages((prev) =>
                   prev.map((msg) => {
-                    if (msg.content_block_index === content_block_index) {
+                    if (msg.tool_use_id === tool_use_id) {
                       return { ...msg, tool_is_active: false };
                     }
                     return msg;
                   })
                 );
+                
+                // Remove from active tool calls
+                setActiveToolCalls(prev => {
+                  const newSet = new Set(prev);
+                  newSet.delete(tool_use_id || '');
+                  return newSet;
+                });
+                
+                // Fetch updated to-do list when a tool call completes
+                if (mode === 'agent') {
+                  fetchTodoList();
+                }
               }
             } catch (e) {
               console.warn('Failed to parse streaming data:', data);
@@ -280,6 +334,8 @@ function App() {
     isProcessingFile: isProcessingFile,
     onFileAttach: handleFileAttach,
     onRemoveAttachment: handleRemoveAttachment,
+    mode: mode,
+    onModeChange: handleModeChange,
   };
 
   if (!hasStarted) {
@@ -322,6 +378,9 @@ function App() {
         isProcessingFile={isProcessingFile}
         onFileAttach={handleFileAttach}
         onRemoveAttachment={handleRemoveAttachment}
+        mode={mode}
+        todoList={todoList}
+        activeToolCalls={activeToolCalls}
       />
     </div>
   )

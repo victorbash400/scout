@@ -10,6 +10,8 @@ interface ChatInputProps {
   isProcessingFile: boolean;
   onFileAttach: (file: File) => void;
   onRemoveAttachment: () => void;
+  mode?: 'chat' | 'agent';
+  onModeChange?: (mode: 'chat' | 'agent') => void;
 }
 
 // Main ChatInput component
@@ -20,12 +22,14 @@ const ChatInput: React.FC<ChatInputProps> = ({
   isProcessingFile,
   onFileAttach,
   onRemoveAttachment,
+  mode = 'chat',
+  onModeChange,
 }) => {
   const [input, setInput] = useState('');
-  const [mode, setMode] = useState<'chat' | 'agent'>('chat');
   const [showModeModal, setShowModeModal] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   // Handles form submission to send a message
   const handleSubmit = (e: React.FormEvent) => {
@@ -34,6 +38,10 @@ const ChatInput: React.FC<ChatInputProps> = ({
     if ((input.trim() || (attachedFile && !isProcessingFile)) && !disabled) {
       onSendMessage(input.trim());
       setInput('');
+      // Reset textarea height to default
+      if (textareaRef.current) {
+        textareaRef.current.style.height = 'auto';
+      }
       // The responsibility of clearing the attachment is now in the parent component (App.tsx)
       // to ensure context is cleared after being used.
     }
@@ -49,7 +57,9 @@ const ChatInput: React.FC<ChatInputProps> = ({
 
   // Handles mode selection
   const handleModeSelect = (selectedMode: 'chat' | 'agent') => {
-    setMode(selectedMode);
+    if (onModeChange) {
+      onModeChange(selectedMode);
+    }
     setShowModeModal(false);
   };
 
@@ -106,7 +116,7 @@ const ChatInput: React.FC<ChatInputProps> = ({
           </div>
         </div>
         
-        <div className="rounded-[22px] bg-white p-3 mt-4">
+        <div className="rounded-[22px] bg-white p-2 mt-4">
           <div className="flex items-end gap-2">
             <div className="flex-1">
               {attachedFile && (
@@ -117,6 +127,7 @@ const ChatInput: React.FC<ChatInputProps> = ({
                 />
               )}
               <textarea
+                ref={textareaRef}
                 value={input}
                 onChange={(e) => {
                   setInput(e.target.value);
@@ -129,9 +140,9 @@ const ChatInput: React.FC<ChatInputProps> = ({
                 className="w-full bg-transparent text-gray-800 placeholder-gray-400 outline-none resize-none text-base pl-2 overflow-hidden"
                 rows={1}
                 disabled={disabled || isProcessingFile}
-                style={{minHeight: '24px', maxHeight: '120px'}}
+                style={{minHeight: '20px', maxHeight: '120px'}}
               />
-              <div className="flex items-center gap-4 pl-2 mt-1">
+              <div className="flex items-center gap-3 pl-2 mt-1">
                 <button type="button" className="text-gray-500 hover:text-green-600" title="Voice Input">
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
@@ -180,7 +191,7 @@ const ChatInput: React.FC<ChatInputProps> = ({
             <button
               type="submit"
               disabled={disabled || isProcessingFile || (!input.trim() && !attachedFile)}
-              className="w-10 h-10 rounded-full flex items-center justify-center transition-colors duration-200 disabled:bg-gray-300 disabled:cursor-not-allowed"
+              className="w-9 h-9 rounded-full flex items-center justify-center transition-colors duration-200 disabled:bg-gray-300 disabled:cursor-not-allowed"
               style={{backgroundColor: (disabled || isProcessingFile || (!input.trim() && !attachedFile)) ? '#d1d5db' : '#00311e'}}
             >
               <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
