@@ -13,6 +13,8 @@ from typing import List, Dict, Any, AsyncGenerator
 import logging
 from datetime import datetime
 from agents.planner_agent import chat_with_planner, chat_with_planner_streaming
+from config.settings import settings
+from storage.local import LocalStorage
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -33,6 +35,15 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Initialize storage client based on settings
+if settings.storage_backend == 'local':
+    storage_client = LocalStorage()
+else:
+    # Placeholder for other storage clients like S3
+    # from storage.s3 import S3Storage
+    # storage_client = S3Storage()
+    raise NotImplementedError(f"Storage backend '{settings.storage_backend}' not implemented")
 
 # WebSocket connection manager
 class ConnectionManager:
@@ -74,33 +85,23 @@ async def health_check():
         "version": "1.0.0"
     }
 
-# Business plan upload endpoint
-@app.post("/api/upload-plan")
-async def upload_business_plan(file: UploadFile = File(...)):
+# File upload endpoint
+@app.post("/api/upload")
+async def upload_file(file: UploadFile = File(...)):
     """
-    Upload and process a business plan document
+    Upload a file to the configured storage backend.
     """
     try:
-        # Validate file type
-        allowed_types = ["application/pdf", "text/plain", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"]
-        if file.content_type not in allowed_types:
-            raise HTTPException(status_code=400, detail="Unsupported file type. Please upload PDF, TXT, or DOCX files.")
-        
-        # Read file content
         content = await file.read()
+        file_path = storage_client.save_file(file.filename, content)
         
-        # TODO: Process the business plan with Planner Agent
-        # For now, return a mock response
         return {
-            "message": "Business plan uploaded successfully",
-            "filename": file.filename,
-            "size": len(content),
-            "analysis_id": f"analysis_{datetime.now().strftime('%Y%m%d_%H%M%S')}",
-            "status": "processing"
+            "message": "File uploaded successfully",
+            "file_path": file_path
         }
     
     except Exception as e:
-        logger.error(f"Error uploading business plan: {str(e)}")
+        logger.error(f"Error uploading file: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error processing file: {str(e)}")
 
 # Get analysis status endpoint

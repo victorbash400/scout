@@ -20,25 +20,59 @@ function App() {
   const [isLoading, setIsLoading] = useState(false);
   const [hasStarted, setHasStarted] = useState(false);
 
-  const handleSendMessage = async (content: string) => {
+  const uploadFile = async (file: File) => {
+    const formData = new FormData();
+    formData.append('file', file);
+
+    try {
+      const response = await fetch('http://localhost:8000/api/upload', {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!response.ok) {
+        throw new Error('File upload failed');
+      }
+
+      const result = await response.json();
+      console.log('File uploaded successfully:', result.file_path);
+      return result.file_path;
+    } catch (error) {
+      console.error('Error uploading file:', error);
+      // Optionally, update the UI to show an error message
+      return null;
+    }
+  };
+
+  const handleSendMessage = async (content: string, file?: File) => {
+    setHasStarted(true);
+    setIsLoading(true);
+
+    let fileInfo = '';
+    if (file) {
+      const uploadedFilePath = await uploadFile(file);
+      if (uploadedFilePath) {
+        fileInfo = `(Attached file: ${file.name}) `;
+      }
+    }
+
+    const messageToSend = `${fileInfo}${content}`.trim();
+
     // Add user message
     const userMessage: Message = {
       role: 'user',
-      content,
-      timestamp: new Date().toLocaleTimeString()
+      content: messageToSend,
+      timestamp: new Date().toLocaleTimeString(),
     };
-    
-    setMessages(prev => [...prev, userMessage]);
-    setIsLoading(true);
-    setHasStarted(true);
+    setMessages((prev) => [...prev, userMessage]);
 
     // Add empty assistant message that we'll update with streaming content
     const aiMessage: Message = {
       role: 'assistant',
       content: '',
-      timestamp: new Date().toLocaleTimeString()
+      timestamp: new Date().toLocaleTimeString(),
     };
-    setMessages(prev => [...prev, aiMessage]);
+    setMessages((prev) => [...prev, aiMessage]);
 
     try {
       // Call the streaming backend planner agent
@@ -47,7 +81,7 @@ function App() {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ message: content }),
+        body: JSON.stringify({ message: messageToSend }),
       });
 
       if (!response.ok) {
@@ -86,10 +120,10 @@ function App() {
             try {
               const parsed = JSON.parse(data);
               if (parsed.content) {
-                setMessages(prev => {
+                setMessages((prev) => {
                   const lastMessage = prev[prev.length - 1];
                   if (lastMessage && lastMessage.role === 'assistant' && !lastMessage.tool_name) {
-                    return prev.map((msg, i) => i === prev.length - 1 ? { ...msg, content: msg.content + parsed.content } : msg);
+                    return prev.map((msg, i) => (i === prev.length - 1 ? { ...msg, content: msg.content + parsed.content } : msg));
                   } else {
                     const newMessage: Message = { role: 'assistant', content: parsed.content, timestamp: new Date().toLocaleTimeString() };
                     return [...prev, newMessage];
@@ -104,17 +138,19 @@ function App() {
                   tool_use_id,
                   content_block_index,
                   tool_is_active: true,
-                  timestamp: new Date().toLocaleTimeString()
+                  timestamp: new Date().toLocaleTimeString(),
                 };
-                setMessages(prev => [...prev, toolMessage]);
+                setMessages((prev) => [...prev, toolMessage]);
               } else if (parsed.tool_end) {
                 const { content_block_index } = parsed.tool_end;
-                setMessages(prev => prev.map(msg => {
-                  if (msg.content_block_index === content_block_index) {
-                    return { ...msg, tool_is_active: false };
-                  }
-                  return msg;
-                }));
+                setMessages((prev) =>
+                  prev.map((msg) => {
+                    if (msg.content_block_index === content_block_index) {
+                      return { ...msg, tool_is_active: false };
+                    }
+                    return msg;
+                  })
+                );
               }
             } catch (e) {
               console.warn('Failed to parse streaming data:', data);
@@ -125,12 +161,14 @@ function App() {
     } catch (error) {
       console.error('Error calling planner agent:', error);
       // Update the last message with error content
-      setMessages(prev => prev.map((msg, index) => {
-        if (index === prev.length - 1 && msg.role === 'assistant') {
-          return { ...msg, content: 'Sorry, I encountered an error. Please make sure the backend server is running.' };
-        }
-        return msg;
-      }));
+      setMessages((prev) =>
+        prev.map((msg, index) => {
+          if (index === prev.length - 1 && msg.role === 'assistant') {
+            return { ...msg, content: 'Sorry, I encountered an error. Please make sure the backend server is running.' };
+          }
+          return msg;
+        })
+      );
     } finally {
       setIsLoading(false);
     }

@@ -41,6 +41,9 @@ class Settings(BaseSettings):
     api_host: str = "0.0.0.0"
     api_port: int = 8000
     cors_origins: list = ["http://localhost:3000", "http://localhost:5173"]
+
+    # Storage Configuration
+    storage_backend: str = "local" # 'local' or 's3'
     
     class Config:
         env_file = ".env"
