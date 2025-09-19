@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import './App.css';
 import ChatSection from './chat/chatsection';
 import ChatInput from './chat/chatinput';
@@ -19,7 +19,15 @@ interface Message {
   } | null;
 }
 
+interface ChatSession {
+  id: string;
+  messages: Message[];
+  createdAt: Date;
+}
+
 function App() {
+  const [currentChatId, setCurrentChatId] = useState<string>('');
+  const [chatSessions, setChatSessions] = useState<ChatSession[]>([]);
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [hasStarted, setHasStarted] = useState(false);
@@ -28,6 +36,19 @@ function App() {
   const [attachedFile, setAttachedFile] = useState<File | null>(null);
   const [isProcessingFile, setIsProcessingFile] = useState(false);
   const [fileContext, setFileContext] = useState<string | null>(null);
+
+  // Initialize first chat session
+  useEffect(() => {
+    const initialChatId = generateChatId();
+    setCurrentChatId(initialChatId);
+    
+    const initialSession: ChatSession = {
+      id: initialChatId,
+      messages: [],
+      createdAt: new Date()
+    };
+    setChatSessions([initialSession]);
+  }, []);
 
   const handleFileAttach = async (file: File) => {
     setAttachedFile(file);
@@ -72,6 +93,48 @@ function App() {
     } catch (error) {
       console.error('Failed to clear backend context:', error);
     }
+  };
+
+  // Generate a unique 6-character chat ID
+  const generateChatId = () => {
+    return Math.random().toString(36).substring(2, 8).toUpperCase();
+  };
+
+  // Start a new chat session
+  const startNewChat = async () => {
+    // Save current chat session if it exists
+    if (currentChatId && messages.length > 0) {
+      const updatedSessions = chatSessions.map(session => 
+        session.id === currentChatId ? { ...session, messages } : session
+      );
+      setChatSessions(updatedSessions);
+    }
+
+    // Clear current messages and file context
+    setMessages([]);
+    setAttachedFile(null);
+    setFileContext(null);
+    setHasStarted(false);
+    
+    // Clear backend context
+    try {
+      await fetch('http://localhost:8000/api/context/clear', { method: 'POST' });
+      console.log('Backend context cleared for new chat.');
+    } catch (error) {
+      console.error('Failed to clear backend context:', error);
+    }
+
+    // Create new chat session
+    const newChatId = generateChatId();
+    setCurrentChatId(newChatId);
+    
+    // Add to chat sessions
+    const newSession: ChatSession = {
+      id: newChatId,
+      messages: [],
+      createdAt: new Date()
+    };
+    setChatSessions(prev => [...prev, newSession]);
   };
 
   const handleSendMessage = async (content: string) => {
@@ -250,7 +313,7 @@ function App() {
         <h1 className="text-2xl font-light text-gray-800">Scout</h1>
       </div>
       
-      <Sidebar />
+      <Sidebar onNewChat={startNewChat} />
       <ChatSection 
         messages={messages}
         isLoading={isLoading}

@@ -1,7 +1,11 @@
 import React, { useState } from 'react';
 import { Plus, FolderOpen } from 'lucide-react';
 
-const Sidebar: React.FC = () => {
+interface SidebarProps {
+  onNewChat?: () => void;
+}
+
+const Sidebar: React.FC<SidebarProps> = ({ onNewChat }) => {
   const [isExpanded, setIsExpanded] = useState(false);
 
   return (
@@ -23,6 +27,7 @@ const Sidebar: React.FC = () => {
               isExpanded ? 'justify-start' : 'justify-center'
             }`}
             title="New Chat"
+            onClick={onNewChat}
           >
             <Plus className="w-5 h-5 flex-shrink-0" />
             {isExpanded && (
