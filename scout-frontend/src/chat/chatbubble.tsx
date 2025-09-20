@@ -32,6 +32,14 @@ const ChatBubble: React.FC<ChatBubbleProps> = ({ role, content, timestamp, tool_
     };
   }
 
+  // Detect agent type from content
+  const isOrchestrator = content.includes('ORCHESTRATOR:');
+  const isSpecialistAgent = content.includes('COMPETITION AGENT:') || 
+                           content.includes('MARKET AGENT:') || 
+                           content.includes('FINANCIAL AGENT:') || 
+                           content.includes('RISK AGENT:') || 
+                           content.includes('SYNTHESIS AGENT:');
+
   if (role === 'user') {
     return (
       <div className="flex justify-end mb-8">
@@ -60,6 +68,35 @@ const ChatBubble: React.FC<ChatBubbleProps> = ({ role, content, timestamp, tool_
     );
   }
 
+  // Handle specialist agent messages (like user messages with black border)
+  if (isSpecialistAgent) {
+    return (
+      <div className="flex justify-end mb-8">
+        <div className="max-w-md">
+          <div className="text-white rounded-3xl px-5 py-3 shadow-sm border-2 border-gray-800" style={{backgroundColor: '#04331c'}}>
+            <p className="text-sm leading-relaxed">{displayContent || " "}</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Handle orchestrator messages (green border)
+  if (isOrchestrator) {
+    return (
+      <div className="mb-8">
+        <div className="w-full text-gray-900">
+          <div className="text-base font-normal text-left prose max-w-none border-2 border-green-500 rounded-lg p-4 bg-green-50" style={{ lineHeight: '1.7' }}>
+            <div className="text-left mb-4">
+              <ReactMarkdown>{content}</ReactMarkdown>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Default assistant messages (no special border)
   return (
     <div className="mb-8">
       <div className="w-full text-gray-900">

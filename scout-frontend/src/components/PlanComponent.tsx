@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ChevronDown, ChevronRight, CheckCircle2, Circle, Target } from 'lucide-react';
+import { ChevronDown, ChevronRight, CheckCircle2, Circle, Target, Play } from 'lucide-react';
 
 interface TodoList {
   competition_tasks: string[];
@@ -51,9 +51,10 @@ const Category: React.FC<CategoryProps> = ({ title, tasks, defaultExpanded = fal
 
 interface PlanComponentProps {
   todoList: TodoList | null;
+  onStart?: () => void;
 }
 
-const PlanComponent: React.FC<PlanComponentProps> = ({ todoList }) => {
+const PlanComponent: React.FC<PlanComponentProps> = ({ todoList, onStart }) => {
   // Check if there are any tasks in the todo list
   const hasTasks = todoList && Object.values(todoList).some(category => category.length > 0);
 
@@ -96,8 +97,25 @@ const PlanComponent: React.FC<PlanComponentProps> = ({ todoList }) => {
         )}
       </div>
       
-      <div className="p-3 border-t border-gray-200 text-xs text-gray-400">
-        This plan will be passed to the Orchestrator Agent when complete.
+      <div className="p-3 border-t border-gray-200">
+        {hasTasks && onStart ? (
+          <div className="space-y-3">
+            <button
+              onClick={onStart}
+              className="flex items-center justify-center gap-2 px-3 py-1.5 border border-green-600 text-green-600 rounded-md hover:bg-green-50 transition-colors font-medium text-xs mx-auto"
+            >
+              <Play className="w-3 h-3" />
+              Confirm
+            </button>
+            <p className="text-xs text-gray-500 text-center">
+              This will deploy the orchestrator and all specialist agents
+            </p>
+          </div>
+        ) : (
+          <p className="text-xs text-gray-400 text-center">
+            This plan will be passed to the Orchestrator Agent when complete.
+          </p>
+        )}
       </div>
     </div>
   );

@@ -3,6 +3,7 @@ import './App.css';
 import ChatSection from './chat/chatsection';
 import ChatInput from './chat/chatinput';
 import Sidebar from './components/sidebar';
+import OrchestratorComponent from './components/OrchestratorComponent';
 import { getTimeBasedGreeting } from './data/greetings';
 
 interface Message {
@@ -42,6 +43,8 @@ function App() {
   const [mode, setMode] = useState<'chat' | 'agent'>('chat'); // Add mode state
   const [todoList, setTodoList] = useState<TodoList | null>(null); // Add to-do list state
   const [activeToolCalls, setActiveToolCalls] = useState<Set<string>>(new Set()); // Track active tool calls
+  const [orchestratorMode, setOrchestratorMode] = useState<'plan' | 'orchestrating'>('plan'); // Track orchestrator state
+  const [orchestratorResponse, setOrchestratorResponse] = useState<string>(''); // Store orchestrator streaming response
 
   // New state for file handling
   const [attachedFile, setAttachedFile] = useState<File | null>(null);
@@ -127,6 +130,8 @@ function App() {
     setFileContext(null);
     setHasStarted(false);
     setTodoList(null); // Clear to-do list
+    setOrchestratorMode('plan'); // Reset orchestrator mode
+    setOrchestratorResponse(''); // Clear orchestrator response
     
     // Clear backend context
     try {
@@ -170,6 +175,15 @@ function App() {
       // Fetch to-do list when switching to agent mode
       fetchTodoList();
     }
+  };
+
+  // Handle Start button click
+  const handleStartOrchestration = async () => {
+    setOrchestratorMode('orchestrating');
+    setOrchestratorResponse('');
+    
+    // Send START message to trigger orchestrator
+    await handleSendMessage('START');
   };
 
   const handleSendMessage = async (content: string) => {
@@ -258,6 +272,11 @@ function App() {
             try {
               const parsed = JSON.parse(data);
               if (parsed.content) {
+                // If we're in orchestrator mode, capture the response
+                if (orchestratorMode === 'orchestrating') {
+                  setOrchestratorResponse(prev => prev + parsed.content);
+                }
+                
                 setMessages((prev) => {
                   const lastMessage = prev[prev.length - 1];
                   if (lastMessage && lastMessage.role === 'assistant' && !lastMessage.tool_name) {
@@ -381,6 +400,9 @@ function App() {
         mode={mode}
         todoList={todoList}
         activeToolCalls={activeToolCalls}
+        orchestratorMode={orchestratorMode}
+        orchestratorResponse={orchestratorResponse}
+        onStartOrchestration={handleStartOrchestration}
       />
     </div>
   )

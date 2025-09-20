@@ -2,6 +2,7 @@ import React, { useRef, useEffect } from 'react';
 import ChatBubble from './chatbubble';
 import ChatInput from './chatinput';
 import PlanComponent from '../components/PlanComponent';
+import OrchestratorComponent from '../components/OrchestratorComponent';
 
 interface Message {
   role: 'user' | 'assistant';
@@ -35,6 +36,9 @@ interface ChatSectionProps {
   mode?: 'chat' | 'agent';
   todoList?: TodoList | null;
   activeToolCalls?: Set<string>;
+  orchestratorMode?: 'plan' | 'orchestrating';
+  orchestratorResponse?: string;
+  onStartOrchestration?: () => void;
 }
 
 const ChatSection: React.FC<ChatSectionProps> = ({
@@ -48,6 +52,9 @@ const ChatSection: React.FC<ChatSectionProps> = ({
   mode = 'chat',
   todoList = null,
   activeToolCalls = new Set(),
+  orchestratorMode = 'plan',
+  orchestratorResponse = '',
+  onStartOrchestration,
 }) => {
   const chatContainerRef = useRef<HTMLDivElement>(null);
 
@@ -112,11 +119,20 @@ const ChatSection: React.FC<ChatSectionProps> = ({
         </div>
       </div>
       
-      {/* Plan component for agent mode */}
+      {/* Plan/Orchestrator component for agent mode */}
       {mode === 'agent' && (activeToolCalls.size > 0 || (todoList && Object.values(todoList).some(category => category.length > 0))) && (
         <div className="w-96 p-4 flex items-center">
           <div className="rounded-xl border border-gray-200 bg-white w-full">
-            <PlanComponent todoList={todoList} />
+            {orchestratorMode === 'plan' ? (
+              <PlanComponent 
+                todoList={todoList} 
+                onStart={onStartOrchestration}
+              />
+            ) : (
+              <OrchestratorComponent 
+                streamingResponse={orchestratorResponse}
+              />
+            )}
           </div>
         </div>
       )}
