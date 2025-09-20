@@ -1,567 +1,474 @@
-# 🕵️ SCOUT - Strands Multi-Agent Intelligence System (7-Agent Model with A2A Protocol)
+# 🕵️ SCOUT - Strands Multi-Agent Intelligence System (Incremental A2A Architecture)
 
 ## 🎯 **SYSTEM OVERVIEW**
 
-An advanced AI system leveraging the Strands SDK with the Agent-to-Agent (A2A) protocol for distributed multi-agent orchestration. SCOUT ingests business plans, orchestrates a team of 7 specialized AI agents across network services to conduct deep analysis, and delivers a comprehensive GO/NO-GO decision with actionable market intelligence reports.
+An advanced AI system leveraging the Strands SDK with the Agent-to-Agent (A2A) protocol for distributed multi-agent orchestration. SCOUT ingests business plans, orchestrates a team of specialized AI agents to conduct deep analysis, and delivers comprehensive GO/NO-GO decisions with actionable market intelligence reports.
+
+**Current Status**: Planner Agent (Phase 1) is operational. System designed for incremental expansion to full 7-agent architecture.
 
 -----
 
 ## 🧠 **MULTI-AGENT ARCHITECTURE**
 
-**Core Philosophy:** The system uses a hybrid approach combining direct function calls for the planner agent (already working) with A2A protocol for distributed specialist agents. This enables seamless integration with the existing FastAPI application while providing distributed processing capabilities for research agents.
+**Core Philosophy:** Incremental hybrid approach combining direct function calls for the planner agent (currently working) with A2A protocol for distributed specialist agents (future phases). This enables seamless integration with the existing FastAPI application while providing distributed processing capabilities for research agents.
 
-### **Hybrid Agent Architecture**
+### **Phase-Based Agent Architecture**
 
 ```mermaid
 graph TD
-    A[📋 PLANNER AGENT<br/>Direct Function Calls<br/>FastAPI Port: 8000] --> B[🎛️ ORCHESTRATOR AGENT<br/>A2A Server Port: 8001]
-    A --> G[📊 SYNTHESIS AGENT<br/>A2A Server Port: 8002]
-    B -.->|A2A Protocol| C[🥊 COMPETITION AGENT<br/>A2A Server Port: 9001]
-    B -.->|A2A Protocol| D[👥 MARKET AGENT<br/>A2A Server Port: 9002]
-    B -.->|A2A Protocol| E[💰 FINANCIAL AGENT<br/>A2A Server Port: 9003]
-    B -.->|A2A Protocol| F[⚠️ RISK AGENT<br/>A2A Server Port: 9004]
+    A[📋 PLANNER AGENT<br/>✅ PHASE 1 - OPERATIONAL<br/>Direct Function Calls<br/>FastAPI Port: 8000] 
+    B[🎛️ ORCHESTRATOR AGENT<br/>🔄 PHASE 2 - NEXT<br/>A2A Server Port: 8001]
+    G[📊 SYNTHESIS AGENT<br/>🔄 PHASE 3 - FUTURE<br/>A2A Server Port: 8002]
+    C[🥊 COMPETITION AGENT<br/>⏳ PHASE 4 - FUTURE<br/>A2A Server Port: 9001]
+    D[👥 MARKET AGENT<br/>⏳ PHASE 4 - FUTURE<br/>A2A Server Port: 9002]
+    E[💰 FINANCIAL AGENT<br/>⏳ PHASE 4 - FUTURE<br/>A2A Server Port: 9003]
+    F[⚠️ RISK AGENT<br/>⏳ PHASE 4 - FUTURE<br/>A2A Server Port: 9004]
     
-    style A fill:#e1f5fe
-    style B fill:#f3e5f5
-    style G fill:#e8f5e8
-    style C fill:#fff3e0
-    style D fill:#fff3e0
-    style E fill:#fff3e0
-    style F fill:#fff3e0
+    A -.->|Future A2A Integration| B
+    A -.->|Future A2A Integration| G
+    B -.->|Future A2A Protocol| C
+    B -.->|Future A2A Protocol| D
+    B -.->|Future A2A Protocol| E
+    B -.->|Future A2A Protocol| F
+    
+    style A fill:#4CAF50
+    style B fill:#FFC107
+    style G fill:#FFC107
+    style C fill:#E0E0E0
+    style D fill:#E0E0E0
+    style E fill:#E0E0E0
+    style F fill:#E0E0E0
 ```
 
-**Hybrid Communication:**
-- **Planner Agent**: Direct function calls within FastAPI app (port 8000)
-- **Orchestrator & Synthesis**: A2A servers (ports 8001-8002)
-- **Specialist Agents**: A2A servers (ports 9001-9004)
-- **A2A Protocol**: HTTP-based agent-to-agent communication for distributed agents
-- **Agent Discovery**: Via `/.well-known/agent.json` endpoints for A2A agents
+**Implementation Phases:**
+- **Phase 1 (Current)**: Planner Agent with direct function calls
+- **Phase 2**: Add Orchestrator Agent with A2A server
+- **Phase 3**: Add Synthesis Agent with A2A server
+- **Phase 4**: Add Specialist Agents (Competition, Market, Financial, Risk)
 
 -----
 
 ## 🏗️ **TECHNICAL ARCHITECTURE**
 
-### **AWS Services Stack**
+### **Current Technology Stack**
 
-  * **Amazon Bedrock:** Claude Sonnet 4 (latest model) for all LLM operations.
-  * **Strands SDK with A2A:** The core multi-agent orchestration framework with Agent-to-Agent protocol support.
-  * **Amazon Bedrock AgentCore:** Provides essential cloud tools like an automated browser, code interpreter, and persistent memory.
-  * **Amazon S3:** Secure storage for business plans and final intelligence reports.
-  * **Amazon CloudWatch:** System monitoring, logging, and performance tracking.
-  * **A2A Protocol:** HTTP-based agent communication standard for distributed multi-agent systems.
+* **Amazon Bedrock**: Claude Sonnet 4 for all LLM operations
+* **Strands SDK**: Core agent framework (currently used for Planner Agent)
+* **FastAPI**: Current web framework for Planner Agent endpoints
+* **Direct Function Calls**: Current integration pattern for Planner Agent
+
+### **Future Technology Stack (Phases 2-4)**
+
+* **Strands SDK with A2A**: Agent-to-Agent protocol support
+* **Amazon Bedrock AgentCore**: Cloud tools (browser, code interpreter, memory)
+* **Amazon S3**: Storage for business plans and intelligence reports
+* **Amazon CloudWatch**: System monitoring and performance tracking
+* **A2A Protocol**: HTTP-based agent communication standard
 
 -----
 
-## 🛠️ **STRANDS AGENT & A2A CONFIGURATION**
+## 🛠️ **CORRECT STRANDS AGENT & A2A CONFIGURATION**
 
-### **1. Planner Agent (Master Controller)**
+> **⚠️ IMPORTANT**: Use these corrected imports and patterns based on [official Strands documentation](https://strandsagents.com/latest/documentation/docs/user-guide/concepts/multi-agent/agent-to-agent/)
 
-The Planner initiates and concludes the analysis, acting as the main interface between the user's request and the distributed agent network. It runs as direct function calls within the FastAPI application.
+### **Correct Installation**
 
-```python
-# PLANNER AGENT Configuration (Direct Function Calls)
-from strands.multiagent.a2a import A2AClientToolProvider
-import httpx
-import asyncio
+```bash
+# Core Strands SDK
+pip install strands-agents
 
-planner_agent = Agent(
-    model="arn:aws:bedrock:eu-north-1:547688237843:inference-profile/eu.anthropic.claude-sonnet-4-20250514-v1:0",
-    tools=[
-        # A2A Client for Orchestrator and Synthesis agents
-        A2AClientToolProvider(known_agent_urls=[
-            "http://localhost:8001",  # Orchestrator Agent
-            "http://localhost:8002",  # Synthesis Agent
-        ]),
-        
-        # Foundational Tools
-        file_read, # To process the initial business plan
-        agent_core_memory, # To maintain context
-        handoff_to_user # For clarifying questions
-    ],
-    system_prompt="""
-    You are SCOUT's master controller using a hybrid approach. Your job is to:
-    1. Receive a business plan and parse it.
-    2. Create a structured, comprehensive research brief with specific to-do lists for the Competition, Market, Financial, and Risk agents.
-    3. Call the 'orchestrator_agent' via A2A protocol with the research brief to begin the analysis.
-    4. Once the Orchestrator returns the compiled data, call the 'synthesis_agent' via A2A protocol to generate the final report.
-    5. Present the final report to the user.
-    
-    You run as direct function calls within the FastAPI application, not as an A2A server.
-    """
-)
-
-# Direct function calls (as currently implemented)
-def chat_with_planner(message: str) -> str:
-    """Direct function call to planner agent (current implementation)"""
-    return planner_agent(message)
-
-async def chat_with_planner_streaming(message: str):
-    """Streaming function call to planner agent (current implementation)"""
-    async for event in planner_agent.stream_async(message):
-        yield event
+# A2A Protocol Support (for Phases 2-4)
+pip install strands-agents-tools[a2a]
 ```
 
-### **2. Orchestrator Agent (Research Coordinator)**
+### **1. Planner Agent (Phase 1 - Current Implementation)**
 
-The Orchestrator manages the four specialist agents via A2A protocol, deploying them in parallel to execute the research brief.
+**Status**: ✅ Operational with direct function calls
+**Integration**: Direct function calls within FastAPI application
+**Location**: `agents/planner_agent.py` (already working)
 
 ```python
-# ORCHESTRATOR AGENT Configuration
-from strands.multiagent.a2a import A2AClientToolProvider
-import asyncio
+# CURRENT IMPLEMENTATION - KEEP AS IS
+import os
+from typing import AsyncGenerator, List, Dict
+from strands import Agent, tool
+from config.settings import settings
+
+# Future A2A integration (when ready for Phase 2+)
+# from strands_tools.a2a_client import A2AClientToolProvider
+
+@tool
+def update_todo_list(category: str, tasks: List[str]) -> str:
+    """Update research to-do list - current implementation works perfectly"""
+    # Keep existing implementation
+    pass
+
+class PlannerAgent:
+    def __init__(self, enable_a2a: bool = False):
+        tools = [update_todo_list]
+        
+        # Phase 2+ Enhancement: Add A2A capabilities when ready
+        if enable_a2a:
+            a2a_provider = A2AClientToolProvider(known_agent_urls=[
+                "http://localhost:8001",  # Orchestrator Agent
+                "http://localhost:8002",  # Synthesis Agent
+            ])
+            tools.extend(a2a_provider.tools)
+
+        self.agent = Agent(
+            model=settings.bedrock_model_id,
+            system_prompt="""Your current system prompt works perfectly - keep it""",
+            tools=tools
+        )
+
+# Current functions - KEEP EXACTLY AS IS
+def chat_with_planner(message: str) -> str:
+    """Current implementation - working perfectly"""
+    return planner.chat(message)
+
+async def chat_with_planner_streaming(message: str) -> AsyncGenerator[str, None]:
+    """Current implementation - working perfectly"""
+    async for chunk in planner.chat_streaming(message):
+        yield chunk
+```
+
+### **2. Orchestrator Agent (Phase 2 - Next Implementation)**
+
+**Status**: 🔄 Ready for implementation
+**Integration**: A2A Server (port 8001)
+**Location**: `agents/orchestrator_agent.py` + `servers/orchestrator_server.py`
+
+```python
+# agents/orchestrator_agent.py
+from strands import Agent
+from strands.multiagent.a2a import A2AServer
+from strands_tools.a2a_client import A2AClientToolProvider
 
 orchestrator_agent = Agent(
+    name="SCOUT Orchestrator",
+    description="Research coordinator managing specialist agents",
     model="arn:aws:bedrock:eu-north-1:547688237843:inference-profile/eu.anthropic.claude-sonnet-4-20250514-v1:0",
     tools=[
-        # A2A Client for specialist agents
+        # A2A Client for specialist agents (Phase 4)
         A2AClientToolProvider(known_agent_urls=[
             "http://localhost:9001",  # Competition Agent
             "http://localhost:9002",  # Market Agent
             "http://localhost:9003",  # Financial Agent
             "http://localhost:9004",  # Risk Agent
         ]),
-        
-        # Research & Analysis Tools from AgentCore
-        browser,
-        code_interpreter,
-        
-        # Coordination Tools
-        workflow,
-        think,
-        parallel_executor  # Custom tool for A2A parallel execution
+        # Add your research tools here: browser, code_interpreter, etc.
     ],
     system_prompt="""
     You are SCOUT's research orchestrator using A2A protocol.
     Your input is a detailed research brief from the Planner Agent.
-    Your job is to deploy the specialist agents (Competition, Market, Financial, Risk) via A2A protocol to complete their assigned tasks.
-    Use the 'parallel_executor' tool to call all specialist agents simultaneously for maximum efficiency.
-    Monitor their progress, collect all their output datasets, and return the complete, raw intelligence package.
+    Deploy specialist agents via A2A protocol to complete research tasks.
+    Coordinate their work and compile results into a complete intelligence package.
     """
 )
+
+# servers/orchestrator_server.py
+orchestrator_server = A2AServer(
+    agent=orchestrator_agent,
+    host="0.0.0.0",
+    port=8001,
+    version="1.0.0"
+)
+
+# Start server
+if __name__ == "__main__":
+    orchestrator_server.serve()
 ```
 
-### **3. Specialist Research Agents (A2A Servers)**
+### **3. Synthesis Agent (Phase 3 - Future Implementation)**
 
-These agents run as independent A2A servers, performing deep, focused intelligence gathering.
-
-```python
-# COMPETITION AGENT Configuration
-from strands.multiagent.a2a import A2AServer
-
-competition_agent = Agent(
-    model="arn:aws:bedrock:eu-north-1:547688237843:inference-profile/eu.anthropic.claude-sonnet-4-20250514-v1:0",
-    tools=[browser, code_interpreter, file_write],
-    system_prompt="""
-    You are SCOUT's competitive intelligence specialist.
-    Your mission is to conduct deep competitor analysis based on the tasks you receive.
-    Output a massive dataset including 50+ competitor profiles, pricing matrices, market positioning maps, and SWOT analyses.
-    """
-)
-
-# Wrap as A2A Server
-competition_server = A2AServer(
-    agent=competition_agent,
-    port=9001,
-    host="0.0.0.0",
-    version="1.0.0"
-)
-
-# MARKET AGENT Configuration
-market_agent = Agent(
-    model="arn:aws:bedrock:eu-north-1:547688237843:inference-profile/eu.anthropic.claude-sonnet-4-20250514-v1:0",
-    tools=[browser, code_interpreter, file_write],
-    system_prompt="""
-    You are SCOUT's market analysis specialist.
-    Your mission is to perform comprehensive market and customer analysis.
-    Output extensive market intelligence including detailed demographics, complete TAM/SAM/SOM calculations, and 5-year growth projections.
-    """
-)
-
-# Wrap as A2A Server
-market_server = A2AServer(
-    agent=market_agent,
-    port=9002,
-    host="0.0.0.0",
-    version="1.0.0"
-)
-
-# FINANCIAL AGENT Configuration
-financial_agent = Agent(
-    model="arn:aws:bedrock:eu-north-1:547688237843:inference-profile/eu.anthropic.claude-sonnet-4-20250514-v1:0",
-    tools=[code_interpreter, browser, file_write],
-    system_prompt="""
-    You are SCOUT's financial modeling specialist.
-    Your mission is to analyze the business model's financial viability.
-    Output comprehensive financial intelligence including detailed unit economics, cash flow projections, and funding requirement calculations.
-    """
-)
-
-# Wrap as A2A Server
-financial_server = A2AServer(
-    agent=financial_agent,
-    port=9003,
-    host="0.0.0.0",
-    version="1.0.0"
-)
-
-# RISK AGENT Configuration
-risk_agent = Agent(
-    model="arn:aws:bedrock:eu-north-1:547688237843:inference-profile/eu.anthropic.claude-sonnet-4-20250514-v1:0",
-    tools=[browser, code_interpreter, file_write],
-    system_prompt="""
-    You are SCOUT's risk assessment specialist.
-    Your mission is to identify and analyze all potential business threats.
-    Output a complete risk intelligence report including regulatory requirements, market/operational risks, and competitive threat models.
-    """
-)
-
-# Wrap as A2A Server
-risk_server = A2AServer(
-    agent=risk_agent,
-    port=9004,
-    host="0.0.0.0",
-    version="1.0.0"
-)
-```
-
-### **4. Synthesis Agent (Report Generator)**
-
-The final agent in the chain, responsible for transforming raw data into a polished, human-readable report.
+**Status**: ⏳ Future implementation
+**Integration**: A2A Server (port 8002)
+**Location**: `agents/synthesis_agent.py` + `servers/synthesis_server.py`
 
 ```python
-# SYNTHESIS AGENT Configuration
+# agents/synthesis_agent.py
+from strands import Agent
 from strands.multiagent.a2a import A2AServer
 
 synthesis_agent = Agent(
+    name="SCOUT Synthesis Agent",
+    description="Report generation and synthesis specialist",
     model="arn:aws:bedrock:eu-north-1:547688237843:inference-profile/eu.anthropic.claude-sonnet-4-20250514-v1:0",
     tools=[
-        # Content Generation Tools
-        code_interpreter, # For creating charts, graphs, and tables
-        diagram,          # For visualizing concepts like positioning maps
-        file_write        # To generate the final PDF/document
+        # Add synthesis tools: code_interpreter, diagram, file_write
     ],
     system_prompt="""
     You are SCOUT's synthesis and reporting specialist.
-    Your input is the raw, compiled data from all four research agents.
-    Your job is to transform this massive dataset into a polished, executive-level intelligence report.
-    You must create:
-    1. An Executive Dashboard with a clear GO/NO-GO decision and confidence score.
-    2. A comprehensive 150+ page report with detailed analysis, charts, graphs, and tables.
-    3. A strategic 90-day action plan with specific milestones.
+    Transform raw research data into polished executive reports.
+    Create: Executive Dashboard, comprehensive analysis report, strategic action plan.
     """
 )
 
-# Wrap as A2A Server
 synthesis_server = A2AServer(
     agent=synthesis_agent,
-    port=8002,
     host="0.0.0.0",
+    port=8002,
     version="1.0.0"
 )
 ```
 
+### **4. Specialist Agents (Phase 4 - Future Implementation)**
+
+**Status**: ⏳ Future implementation
+**Integration**: A2A Servers (ports 9001-9004)
+
+```python
+# Template for specialist agents
+from strands import Agent
+from strands.multiagent.a2a import A2AServer
+
+def create_specialist_agent(name: str, description: str, system_prompt: str, port: int):
+    agent = Agent(
+        name=name,
+        description=description,
+        model="arn:aws:bedrock:eu-north-1:547688237843:inference-profile/eu.anthropic.claude-sonnet-4-20250514-v1:0",
+        tools=[
+            # Add specialist tools: browser, code_interpreter, file_write
+        ],
+        system_prompt=system_prompt
+    )
+    
+    server = A2AServer(
+        agent=agent,
+        host="0.0.0.0",
+        port=port,
+        version="1.0.0"
+    )
+    
+    return agent, server
+
+# Competition Agent (Port 9001)
+competition_agent, competition_server = create_specialist_agent(
+    name="SCOUT Competition Analyst",
+    description="Competitive intelligence specialist",
+    system_prompt="You are SCOUT's competitive intelligence specialist...",
+    port=9001
+)
+
+# Market Agent (Port 9002)  
+market_agent, market_server = create_specialist_agent(
+    name="SCOUT Market Analyst", 
+    description="Market analysis specialist",
+    system_prompt="You are SCOUT's market analysis specialist...",
+    port=9002
+)
+
+# Financial Agent (Port 9003)
+financial_agent, financial_server = create_specialist_agent(
+    name="SCOUT Financial Analyst",
+    description="Financial modeling specialist", 
+    system_prompt="You are SCOUT's financial modeling specialist...",
+    port=9003
+)
+
+# Risk Agent (Port 9004)
+risk_agent, risk_server = create_specialist_agent(
+    name="SCOUT Risk Analyst",
+    description="Risk assessment specialist",
+    system_prompt="You are SCOUT's risk assessment specialist...",
+    port=9004
+)
+```
+
 -----
 
-## 🔄 **HYBRID EXECUTION FLOW**
+## 🔄 **INCREMENTAL IMPLEMENTATION FLOW**
 
-### **System Startup Phase**
-1. **FastAPI Application Startup**
-   * Start FastAPI app with Planner Agent (port 8000)
-   * Launch A2A agent servers:
-     - Orchestrator Agent (port 8001)
-     - Synthesis Agent (port 8002)
-     - Specialist Agents (ports 9001-9004)
-   * Verify A2A agent discovery via `/.well-known/agent.json` endpoints
+### **Phase 1: Current State (Working)**
+1. **Planner Agent** receives business plans via FastAPI
+2. **Planner Agent** creates structured to-do lists using `update_todo_list` tool
+3. **Planner Agent** provides analysis and recommendations directly
+4. **FastAPI endpoints** handle file uploads and streaming responses
 
-### **Analysis Execution Phase**
+### **Phase 2: Add Orchestrator (Next Step)**
+1. Install A2A dependencies: `pip install strands-agents-tools[a2a]`
+2. Create `agents/orchestrator_agent.py` and `servers/orchestrator_server.py`
+3. Enable A2A in Planner Agent: `PlannerAgent(enable_a2a=True)`
+4. Update Planner system prompt to include A2A coordination
+5. Start Orchestrator server alongside FastAPI app
 
-1.  **Phase 1: Plan Intake**
+### **Phase 3: Add Synthesis (Future)**
+1. Create `agents/synthesis_agent.py` and `servers/synthesis_server.py`
+2. Update Planner A2A URLs to include Synthesis agent
+3. Modify workflow: Planner → Orchestrator → Synthesis → User
 
-      * **USER** uploads a business plan via FastAPI endpoint.
-      * **PLANNER AGENT** (direct function call) reads the document and generates a structured, multi-part research brief.
-
-2.  **Phase 2: Intelligence Gathering**
-
-      * **PLANNER AGENT** calls the `orchestrator_agent` via A2A protocol (port 8001), passing the research brief as input.
-      * **ORCHESTRATOR AGENT** uses `parallel_executor` tool to deploy all specialist agents simultaneously via A2A protocol:
-        - `competition_agent` (port 9001)
-        - `market_agent` (port 9002) 
-        - `financial_agent` (port 9003)
-        - `risk_agent` (port 9004)
-      * The four specialist agents execute their research autonomously using their tools (browser, code interpreter).
-      * **ORCHESTRATOR AGENT** collects the massive output datasets from all four specialists via A2A responses and returns them as a single package.
-
-3.  **Phase 3: Report Generation**
-
-      * **PLANNER AGENT** receives the compiled raw data from the Orchestrator.
-      * **PLANNER AGENT** calls the `synthesis_agent` via A2A protocol (port 8002), passing the complete data package as input.
-      * **SYNTHESIS AGENT** processes all the data, generates charts, tables, and visuals, and assembles the final Executive Dashboard and Intelligence Report.
-
-4.  **Phase 4: Delivery**
-
-      * The final report is saved to Amazon S3 and presented to the user via FastAPI response.
-
-### **Hybrid Communication Benefits**
-- **Seamless Integration**: Planner agent works exactly as it does now
-- **Distributed Processing**: Specialist agents run independently across different ports
-- **Fault Tolerance**: If one specialist agent fails, others continue processing
-- **Scalability**: Specialist agents can be deployed across different servers/containers
-- **Monitoring**: Each A2A agent can be monitored independently via CloudWatch
-- **Backward Compatibility**: Existing FastAPI endpoints continue to work unchanged
+### **Phase 4: Add Specialists (Future)**
+1. Create all specialist agents (Competition, Market, Financial, Risk)
+2. Update Orchestrator A2A URLs to include all specialists
+3. Implement parallel research coordination
+4. Full multi-agent intelligence pipeline operational
 
 -----
 
-## 📁 **HYBRID PROJECT STRUCTURE**
-
-Updated file structure to support hybrid architecture with direct function calls for planner and A2A servers for other agents.
+## 📁 **PROJECT STRUCTURE (Incremental)**
 
 ```
 scout/
-├── SCOUT_BLUEPRINT.md
+├── SCOUT_BLUEPRINT.md                 # This document
 ├── scout-backend/
 │   ├── agents/
-│   │   ├── planner_agent.py
-│   │   ├── orchestrator_agent.py
-│   │   ├── competition_agent.py
-│   │   ├── market_agent.py
-│   │   ├── financial_agent.py
-│   │   ├── risk_agent.py
-│   │   └── synthesis_agent.py
-│   ├── servers/
+│   │   ├── planner_agent.py          # ✅ Phase 1 - Current
+│   │   ├── orchestrator_agent.py     # 🔄 Phase 2 - Next
+│   │   ├── synthesis_agent.py        # ⏳ Phase 3 - Future
+│   │   ├── competition_agent.py      # ⏳ Phase 4 - Future
+│   │   ├── market_agent.py           # ⏳ Phase 4 - Future
+│   │   ├── financial_agent.py        # ⏳ Phase 4 - Future
+│   │   └── risk_agent.py             # ⏳ Phase 4 - Future
+│   ├── servers/                      # 🔄 Phase 2+ - A2A Servers
 │   │   ├── __init__.py
-│   │   ├── competition_server.py      # A2A server wrapper
-│   │   ├── market_server.py          # A2A server wrapper
-│   │   ├── financial_server.py       # A2A server wrapper
-│   │   ├── risk_server.py           # A2A server wrapper
-│   │   ├── synthesis_server.py      # A2A server wrapper
-│   │   └── orchestrator_server.py   # A2A server wrapper
-│   │   # Note: planner_server.py NOT needed - planner uses direct function calls
+│   │   ├── orchestrator_server.py    # 🔄 Phase 2
+│   │   ├── synthesis_server.py       # ⏳ Phase 3
+│   │   ├── competition_server.py     # ⏳ Phase 4
+│   │   ├── market_server.py          # ⏳ Phase 4
+│   │   ├── financial_server.py       # ⏳ Phase 4
+│   │   └── risk_server.py            # ⏳ Phase 4
 │   ├── core/
-│   │   ├── strands_client.py
-│   │   ├── bedrock_client.py
-│   │   ├── agentcore_tools.py
-│   │   ├── agent_memory.py
-│   │   ├── a2a_client.py           # A2A client utilities
-│   │   ├── agent_discovery.py      # Agent discovery logic
-│   │   └── parallel_executor.py    # Custom parallel execution tool
+│   │   ├── strands_client.py         # ✅ Current
+│   │   ├── bedrock_client.py         # ✅ Current
+│   │   └── agent_discovery.py        # 🔄 Phase 2 - A2A discovery
 │   ├── utils/
-│   │   ├── server_manager.py       # Manage A2A server lifecycle
-│   │   └── health_checker.py       # Monitor agent health
+│   │   ├── server_manager.py         # 🔄 Phase 2 - A2A lifecycle
+│   │   └── health_checker.py         # 🔄 Phase 2 - A2A monitoring
 │   ├── config/
-│   │   ├── a2a_config.py          # A2A server configurations
-│   │   └── port_config.py         # Port assignments
-│   ├── main.py                    # Main application entry point
-│   ├── requirements.txt           # Updated with A2A dependencies
-│   └── ... (rest of the backend structure)
-├── scout-frontend/
-│   ├── ... (frontend structure)
-├── agentcore-config/
-│   ├── ... (config files)
-├── deployment/
-│   ├── docker-compose.yml         # Multi-container A2A setup
-│   ├── dockerfiles/
-│   │   ├── competition.Dockerfile
-│   │   ├── market.Dockerfile
-│   │   ├── financial.Dockerfile
-│   │   ├── risk.Dockerfile
-│   │   └── core.Dockerfile
-│   └── ... (deployment scripts)
-└── scripts/
-    ├── start_agents.py            # Start all A2A servers
-    ├── stop_agents.py             # Stop all A2A servers
-    └── health_check.py            # Check agent health
-```
-
-### **Key Hybrid Architecture Additions**
-- **`servers/`**: A2A server wrapper files (excluding planner)
-- **`core/a2a_client.py`**: A2A client utilities and communication
-- **`core/agent_discovery.py`**: Dynamic agent discovery for A2A agents
-- **`core/parallel_executor.py`**: Custom parallel execution for A2A
-- **`utils/server_manager.py`**: Manage A2A server lifecycle
-- **`config/a2a_config.py`**: A2A-specific configurations
-- **`deployment/docker-compose.yml`**: Multi-container deployment for A2A agents
-- **`main.py`**: FastAPI app with direct planner agent integration (existing)
-
------
-
-## 🚀 **HYBRID IMPLEMENTATION REQUIREMENTS**
-
-### **Dependencies**
-```bash
-# Install Strands SDK with A2A support
-pip install 'strands-agents[a2a]'
-
-# Additional A2A dependencies
-pip install httpx asyncio fastapi uvicorn
-```
-
-### **Port Configuration**
-```python
-# config/port_config.py
-A2A_PORTS = {
-    "planner": 8000,
-    "orchestrator": 8001, 
-    "synthesis": 8002,
-    "competition": 9001,
-    "market": 9002,
-    "financial": 9003,
-    "risk": 9004
-}
-```
-
-### **A2A Server Startup Script**
-```python
-# scripts/start_agents.py
-import asyncio
-from concurrent.futures import ThreadPoolExecutor
-from servers import *
-
-async def start_all_agents():
-    """Start all A2A servers in parallel (excluding planner)"""
-    servers = [
-        competition_server,
-        market_server,
-        financial_server,
-        risk_server,
-        synthesis_server,
-        orchestrator_server
-        # Note: planner_server NOT included - planner uses direct function calls
-    ]
-    
-    with ThreadPoolExecutor(max_workers=6) as executor:
-        futures = [executor.submit(server.serve) for server in servers]
-        await asyncio.gather(*futures)
-
-if __name__ == "__main__":
-    asyncio.run(start_all_agents())
-```
-
-### **Agent Discovery Implementation**
-```python
-# core/agent_discovery.py
-from strands.multiagent.a2a import A2ACardResolver
-import httpx
-
-async def discover_available_agents():
-    """Discover all available A2A agents"""
-    agent_urls = [
-        "http://localhost:9001",  # Competition
-        "http://localhost:9002",  # Market
-        "http://localhost:9003",  # Financial
-        "http://localhost:9004",  # Risk
-    ]
-    
-    available_agents = []
-    async with httpx.AsyncClient() as client:
-        for url in agent_urls:
-            try:
-                resolver = A2ACardResolver(httpx_client=client, base_url=url)
-                agent_card = await resolver.get_agent_card()
-                available_agents.append({
-                    "url": url,
-                    "name": agent_card.name,
-                    "description": agent_card.description,
-                    "capabilities": agent_card.skills
-                })
-            except Exception as e:
-                print(f"Agent at {url} not available: {e}")
-    
-    return available_agents
-```
-
-### **Parallel Execution Tool**
-```python
-# core/parallel_executor.py
-import asyncio
-from strands.multiagent.a2a import A2AClient, A2ACardResolver
-import httpx
-
-async def execute_parallel_research(research_brief):
-    """Execute research tasks in parallel across A2A agents"""
-    agent_urls = [
-        "http://localhost:9001",  # Competition
-        "http://localhost:9002",  # Market
-        "http://localhost:9003",  # Financial
-        "http://localhost:9004",  # Risk
-    ]
-    
-    async def call_agent(url, task_data):
-        async with httpx.AsyncClient() as client:
-            resolver = A2ACardResolver(httpx_client=client, base_url=url)
-            agent_card = await resolver.get_agent_card()
-            a2a_client = A2AClient(httpx_client=client, agent_card=agent_card)
-            
-            # Send research task to agent
-            response = await a2a_client.send_message(task_data)
-            return response
-    
-    # Execute all agents in parallel
-    tasks = [
-        call_agent(url, research_brief.get_task_for_agent(url))
-        for url in agent_urls
-    ]
-    
-    results = await asyncio.gather(*tasks, return_exceptions=True)
-    return compile_research_results(results)
-```
-
-### **Health Monitoring**
-```python
-# utils/health_checker.py
-import httpx
-import asyncio
-
-async def check_agent_health(agent_url):
-    """Check if an A2A agent is healthy"""
-    try:
-        async with httpx.AsyncClient() as client:
-            response = await client.get(f"{agent_url}/.well-known/agent.json", timeout=5.0)
-            return response.status_code == 200
-    except:
-        return False
-
-async def monitor_all_agents():
-    """Monitor health of all A2A agents (excluding planner)"""
-    agent_urls = [
-        "http://localhost:8001",  # Orchestrator
-        "http://localhost:8002",  # Synthesis
-        "http://localhost:9001",  # Competition
-        "http://localhost:9002",  # Market
-        "http://localhost:9003",  # Financial
-        "http://localhost:9004",  # Risk
-        # Note: Planner agent health checked via FastAPI /health endpoint
-    ]
-    
-    health_status = {}
-    for url in agent_urls:
-        health_status[url] = await check_agent_health(url)
-    
-    return health_status
+│   │   ├── settings.py               # ✅ Current
+│   │   └── a2a_config.py            # 🔄 Phase 2 - A2A ports
+│   ├── main.py                       # ✅ Current FastAPI app
+│   └── requirements.txt              # Update per phase
+├── scripts/
+│   ├── start_agents.py               # 🔄 Phase 2 - A2A startup
+│   ├── stop_agents.py                # 🔄 Phase 2 - A2A shutdown
+│   └── health_check.py               # 🔄 Phase 2 - A2A health
+└── deployment/
+    └── docker-compose.yml            # ⏳ Phase 4 - Multi-container
 ```
 
 -----
 
-## 🎯 **HYBRID ARCHITECTURE BENEFITS FOR SCOUT**
+## 🚀 **IMPLEMENTATION CHECKLIST**
 
-### **Scalability**
-- **Horizontal Scaling**: Deploy agents across multiple servers
-- **Load Distribution**: Balance workload across agent instances
-- **Resource Optimization**: Scale individual agents based on demand
+### **Phase 1 Checklist (Current - Complete)**
+- [x] Planner Agent with direct function calls
+- [x] FastAPI integration working
+- [x] Business plan upload functionality
+- [x] Structured to-do list creation
+- [x] Streaming responses
+- [x] Mode-based behavior (CHAT/AGENT)
 
-### **Fault Tolerance**
-- **Independent Failures**: One agent failure doesn't crash the system
-- **Graceful Degradation**: Continue processing with available agents
-- **Automatic Recovery**: Restart failed agents without affecting others
+### **Phase 2 Checklist (Next)**
+- [ ] Install: `pip install strands-agents-tools[a2a]`
+- [ ] Create `agents/orchestrator_agent.py`
+- [ ] Create `servers/orchestrator_server.py`
+- [ ] Update `agents/planner_agent.py` to enable A2A
+- [ ] Create `utils/server_manager.py` for A2A lifecycle
+- [ ] Create `scripts/start_agents.py` for server startup
+- [ ] Test Planner → Orchestrator A2A communication
+- [ ] Update system prompts for coordination workflow
 
-### **Development & Testing**
-- **Independent Development**: Develop and test A2A agents separately
-- **Modular Deployment**: Deploy only the A2A agents you need
-- **Easy Debugging**: Monitor and debug individual A2A agents
-- **Backward Compatibility**: Existing planner agent continues to work unchanged
+### **Phase 3 Checklist (Future)**
+- [ ] Create `agents/synthesis_agent.py`
+- [ ] Create `servers/synthesis_server.py` 
+- [ ] Update Planner A2A URLs to include Synthesis
+- [ ] Test full workflow: Planner → Orchestrator → Synthesis
+- [ ] Implement report generation capabilities
 
-### **Production Benefits**
-- **High Availability**: 99.9% uptime with proper orchestration
-- **Cost Optimization**: Scale A2A agents based on actual usage
-- **Monitoring**: Granular monitoring and alerting per A2A agent
-- **Seamless Integration**: No changes needed to existing FastAPI endpoints
-- **Gradual Migration**: Can implement A2A agents incrementally
+### **Phase 4 Checklist (Future)**
+- [ ] Create all specialist agent files
+- [ ] Create all specialist server files
+- [ ] Update Orchestrator A2A URLs to include specialists
+- [ ] Implement parallel research coordination
+- [ ] Create Docker composition for multi-container deployment
+- [ ] Implement comprehensive monitoring and health checks
+
+-----
+
+## 📚 **REFERENCE DOCUMENTATION**
+
+### **Official Strands SDK Resources**
+- **A2A Protocol Documentation**: https://strandsagents.com/latest/documentation/docs/user-guide/concepts/multi-agent/agent-to-agent/
+- **Strands SDK GitHub**: https://github.com/strands-agents/sdk-python
+- **A2A Protocol Specification**: https://a2aproject.github.io/A2A/latest/
+- **Strands Tools Documentation**: https://strandsagents.com/latest/documentation/docs/user-guide/tools/
+
+### **Critical Implementation Notes**
+
+1. **Correct Imports**:
+   ```python
+   # ✅ CORRECT
+   from strands.multiagent.a2a import A2AServer
+   from strands_tools.a2a_client import A2AClientToolProvider
+   
+   # ❌ WRONG - Don't use these
+   # from strands.multiagent.a2a import A2AClientToolProvider
+   ```
+
+2. **Installation Commands**:
+   ```bash
+   # ✅ CORRECT
+   pip install strands-agents-tools[a2a]
+   
+   # ❌ WRONG
+   # pip install strands-agents[a2a]
+   ```
+
+3. **A2A Server Creation**:
+   ```python
+   # ✅ CORRECT
+   server = A2AServer(agent=my_agent, host="0.0.0.0", port=9001)
+   server.serve()  # For synchronous
+   await server.serve_async()  # For asynchronous
+   ```
+
+4. **Natural Language Coordination**: A2AClientToolProvider automatically handles agent discovery and communication. No custom client code needed.
+
+-----
+
+## ⚡ **QUICK START FOR PHASE 2**
+
+To move from Phase 1 to Phase 2 immediately:
+
+1. **Install A2A support**:
+   ```bash
+   pip install strands-agents-tools[a2a]
+   ```
+
+2. **Create minimal orchestrator**:
+   ```python
+   # agents/orchestrator_agent.py
+   from strands import Agent
+   from strands.multiagent.a2a import A2AServer
+   
+   orchestrator_agent = Agent(
+       name="SCOUT Orchestrator",
+       description="Research coordinator",
+       system_prompt="You coordinate research tasks from the Planner Agent."
+   )
+   
+   orchestrator_server = A2AServer(agent=orchestrator_agent, port=8001)
+   
+   if __name__ == "__main__":
+       orchestrator_server.serve()
+   ```
+
+3. **Enable A2A in Planner**:
+   ```python
+   # In agents/planner_agent.py
+   planner = PlannerAgent(enable_a2a=True)
+   ```
+
+4. **Test integration**:
+   ```bash
+   # Terminal 1: Start orchestrator
+   python agents/orchestrator_agent.py
+   
+   # Terminal 2: Start FastAPI (as usual)
+   python main.py
+   
+   # Test: Send "[MODE: AGENT] Can you coordinate with the orchestrator agent?"
+   ```
+
+This blueprint provides the complete roadmap from your current working Phase 1 to the full multi-agent system, with proper Strands SDK implementation patterns and official documentation references.
