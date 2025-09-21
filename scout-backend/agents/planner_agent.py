@@ -1,11 +1,16 @@
 import os
 import asyncio
+import logging
 from typing import AsyncGenerator, List, Dict
 from strands import Agent, tool
+from strands.multiagent.a2a import A2AServer
 from dotenv import load_dotenv
 from config.settings import settings
 
 load_dotenv()
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 # Global to-do list storage
 todo_list_storage: Dict[str, List[str]] = {
@@ -34,6 +39,9 @@ def update_todo_list(category: str, tasks: List[str]) -> str:
     todo_list_storage[category].extend(tasks)
     return f"Added {len(tasks)} tasks to {category}. Total tasks in this category: {len(todo_list_storage[category])}"
 
+
+# A2A client tools will be added dynamically to the agent
+
 class PlannerAgent:
     def __init__(self):
         # Load AWS credentials once globally
@@ -44,6 +52,12 @@ class PlannerAgent:
         if settings.aws_region:
             os.environ['AWS_DEFAULT_REGION'] = settings.aws_region
         print("✅ AWS credentials loaded successfully")
+
+        # Create A2A client tools for orchestrator communication
+        from strands_tools.a2a_client import A2AClientToolProvider
+        a2a_provider = A2AClientToolProvider(
+            known_agent_urls=["http://127.0.0.1:9001"]  # Use 127.0.0.1 for consistency
+        )
 
         self.agent = Agent(
             model=settings.bedrock_model_id,
@@ -61,11 +75,19 @@ class PlannerAgent:
             AGENT MODE:
             1. Analyze the business plan and identify key areas for research
             2. Create a structured to-do list with specific tasks for different specialist agents
-            3. BEFORE calling the update_todo_list tool, EXPLAIN to the user:
+            3. BEFORE calling EACH update_todo_list tool, EXPLAIN to the user:
                - What specific tasks you're about to add
                - Why these tasks are important for the research plan
                - Which category they belong to
-            4. Then use the update_todo_list tool to add tasks to the appropriate categories
+            4. Then use the update_todo_list tool to add tasks to the appropriate category and repeat for each tool call
+            5. After completing the plan, ask the user if they are satisfied with the plan and if u should send the plan to the orchestrator?"
+            6. If user confirms with ,BEFORE calling the orchestrator A2A tool, EXPLAIN to the user:
+               - What you're about to send to the orchestrator
+               - Why you're sending it now
+               - What the orchestrator will do with it
+            7. Then use the a2a_send_message tool to send the complete plan to http://127.0.0.1:9001
+               
+            IMPORTANT: Only use the local orchestrator at http://127.0.0.1:9001. Do NOT try to discover external agents or use any other URLs.
             
             The to-do list categories are:
             - competition_tasks: Direct competitor analysis, pricing intelligence, market positioning, financial intelligence
@@ -81,15 +103,18 @@ class PlannerAgent:
             Example interaction in AGENT MODE:
             User: "I have a food delivery business plan"
             Assistant: "I'll analyze this plan and create research tasks. Let me first identify the key competitors we should research."
-            Assistant: "I'm going to add competitor analysis tasks to the competition_tasks category because understanding the competitive landscape is crucial for your market entry strategy."
+            Assistant: "let me  add competitor analysis tasks to the competition_tasks category because understanding the competitive landscape is crucial for your market entry strategy."
             Assistant: [Tool call to update_todo_list with competition tasks]
             Assistant: "Now I'll focus on market sizing since we need to understand the total addressable market for your service."
             Assistant: [Tool call to update_todo_list with market sizing tasks]
             
             Keep answers concise and focused on creating a comprehensive research plan in AGENT MODE.
             Always explain your reasoning before calling tools in AGENT MODE.
+            
+            CRITICAL: When communicating with the orchestrator, ONLY use the local orchestrator at http://127.0.0.1:9001. 
+            Do NOT use a2a_discover_agent tool to find external agents. Only use a2a_send_message to send to the known local orchestrator.
             """,
-            tools=[update_todo_list]
+            tools=[update_todo_list] + a2a_provider.tools
         )
         self.document_context = None  # For attached file context
         print(f"✅ Planner Agent initialized with {settings.bedrock_model_id}")
@@ -160,3 +185,34 @@ def chat_with_planner(message: str) -> str:
 async def chat_with_planner_streaming(message: str) -> AsyncGenerator[str, None]:
     async for chunk in planner.chat_streaming(message):
         yield chunk
+
+# A2A Server setup
+def create_planner_a2a_server(port: int = 9000):
+    """Create and return the A2A server for the planner agent."""
+    try:
+        # Create A2A client tools for orchestrator communication
+        from strands_tools.a2a_client import A2AClientToolProvider
+        a2a_provider = A2AClientToolProvider(
+            known_agent_urls=["http://127.0.0.1:9001"]  # Use 127.0.0.1 for consistency
+        )
+        
+        # Create a new agent instance with proper description for A2A
+        a2a_agent = Agent(
+            name="SCOUT Planner Agent",
+            description="SCOUT's Planner Agent that analyzes business plans and creates structured research to-do lists. Can communicate with the Orchestrator Agent via A2A protocol.",
+            model=settings.bedrock_model_id,
+            system_prompt=planner.agent.system_prompt,
+            tools=[update_todo_list] + a2a_provider.tools
+        )
+        
+        a2a_server = A2AServer(
+            agent=a2a_agent,
+            host="127.0.0.1",
+            port=port,
+            version="1.0.0"
+        )
+        logger.info(f"✅ Planner A2A Server created on port {port}")
+        return a2a_server
+    except Exception as e:
+        logger.error(f"Error creating planner A2A server: {e}")
+        raise

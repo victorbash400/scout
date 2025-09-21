@@ -9,10 +9,12 @@ from fastapi.responses import JSONResponse, StreamingResponse
 import uvicorn
 import asyncio 
 import json
+import threading
 from typing import List, Dict, Any, AsyncGenerator
 import logging
 from datetime import datetime
-from agents.planner_agent import chat_with_planner, chat_with_planner_streaming, set_planner_context, clear_planner_context, get_planner_todo_list, clear_planner_todo_list
+from agents.planner_agent import chat_with_planner, chat_with_planner_streaming, set_planner_context, clear_planner_context, get_planner_todo_list, clear_planner_todo_list, create_planner_a2a_server
+from agents.orchestrator_agent import create_orchestrator_a2a_server
 from config.settings import settings
 from storage.local import LocalStorage
 from utils.pdf_parser import extract_text_from_pdf
@@ -45,6 +47,60 @@ else:
     # from storage.s3 import S3Storage
     # storage_client = S3Storage()
     raise NotImplementedError(f"Storage backend '{settings.storage_backend}' not implemented")
+
+# Start A2A agents in background threads
+def start_a2a_agents():
+    """Start both A2A agents in background threads with health checks"""
+    try:
+        # Start Planner A2A Server on port 9000
+        def run_planner_server():
+            planner_server = create_planner_a2a_server(port=9000)
+            logger.info("Starting Planner A2A Server on port 9000...")
+            planner_server.serve()
+        
+        planner_thread = threading.Thread(target=run_planner_server, daemon=True)
+        planner_thread.start()
+        logger.info("✅ Planner A2A Server started in background")
+        
+        # Start Orchestrator A2A Server on port 9001
+        def run_orchestrator_server():
+            orchestrator_server = create_orchestrator_a2a_server(port=9001)
+            logger.info("Starting Orchestrator A2A Server on port 9001...")
+            orchestrator_server.serve()
+        
+        orchestrator_thread = threading.Thread(target=run_orchestrator_server, daemon=True)
+        orchestrator_thread.start()
+        logger.info("✅ Orchestrator A2A Server started in background")
+        
+        # Give servers more time to start and add health check
+        import time
+        time.sleep(5)  # Increased from 2 seconds
+        
+        # Health check for A2A servers
+        try:
+            import httpx
+            with httpx.Client(timeout=5.0) as client:
+                # Check planner agent card
+                planner_response = client.get("http://127.0.0.1:9000/.well-known/agent-card.json")
+                if planner_response.status_code == 200:
+                    logger.info("✅ Planner A2A Server health check passed")
+                else:
+                    logger.warning(f"⚠️ Planner A2A Server health check failed: {planner_response.status_code}")
+                
+                # Check orchestrator agent card
+                orchestrator_response = client.get("http://127.0.0.1:9001/.well-known/agent-card.json")
+                if orchestrator_response.status_code == 200:
+                    logger.info("✅ Orchestrator A2A Server health check passed")
+                else:
+                    logger.warning(f"⚠️ Orchestrator A2A Server health check failed: {orchestrator_response.status_code}")
+        except Exception as health_error:
+            logger.warning(f"⚠️ A2A Server health check failed: {health_error}")
+        
+    except Exception as e:
+        logger.error(f"Error starting A2A agents: {e}")
+
+# Start A2A agents
+start_a2a_agents()
 
 # WebSocket connection manager
 class ConnectionManager:
@@ -261,19 +317,21 @@ async def start_conversation():
 @app.get("/api/agents/status")
 async def get_agents_status():
     """
-    Get the status of all 7 agents
+    Get the status of all agents including A2A agents
     """
     return {
         "agents": {
-            "planner": {"status": "active", "last_activity": datetime.now().isoformat()},
-            "orchestrator": {"status": "idle", "last_activity": None},
+            "planner": {"status": "active", "last_activity": datetime.now().isoformat(), "port": 8000},
+            "planner_a2a": {"status": "active", "last_activity": datetime.now().isoformat(), "port": 9000},
+            "orchestrator_a2a": {"status": "active", "last_activity": datetime.now().isoformat(), "port": 9001},
             "competition": {"status": "idle", "last_activity": None},
             "market": {"status": "idle", "last_activity": None},
             "financial": {"status": "idle", "last_activity": None},
             "risk": {"status": "idle", "last_activity": None},
             "synthesis": {"status": "idle", "last_activity": None}
         },
-        "system_status": "operational"
+        "system_status": "operational",
+        "a2a_communication": "enabled"
     }
 
 if __name__ == "__main__":

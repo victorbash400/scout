@@ -1,7 +1,8 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useState } from 'react';
 import ChatBubble from './chatbubble';
 import ChatInput from './chatinput';
 import PlanComponent from '../components/PlanComponent';
+import OrchestratorComponent from '../components/OrchestratorComponent';
 
 interface Message {
   role: 'user' | 'assistant';
@@ -50,6 +51,17 @@ const ChatSection: React.FC<ChatSectionProps> = ({
   activeToolCalls = new Set(),
 }) => {
   const chatContainerRef = useRef<HTMLDivElement>(null);
+  const [showOrchestrator, setShowOrchestrator] = useState(false);
+
+  // Check if orchestrator should be shown based on messages
+  useEffect(() => {
+    const shouldShowOrchestrator = messages.some(msg => 
+      msg.content.toLowerCase().includes('orchestrator') || 
+      msg.content.toLowerCase().includes('send to orchestrator') ||
+      msg.content.toLowerCase().includes('plan sent to orchestrator')
+    );
+    setShowOrchestrator(shouldShowOrchestrator);
+  }, [messages]);
 
   // Auto-scroll to bottom when messages change
   useEffect(() => {
@@ -112,13 +124,22 @@ const ChatSection: React.FC<ChatSectionProps> = ({
         </div>
       </div>
       
-      {/* Plan component for agent mode */}
-      {mode === 'agent' && (activeToolCalls.size > 0 || (todoList && Object.values(todoList).some(category => category.length > 0))) && (
+      {/* Show Orchestrator component when orchestrator is active, otherwise show Plan component */}
+      {showOrchestrator ? (
         <div className="w-96 p-4 flex items-center">
           <div className="rounded-xl border border-gray-200 bg-white w-full">
-            <PlanComponent todoList={todoList} />
+            <OrchestratorComponent isActive={showOrchestrator} />
           </div>
         </div>
+      ) : (
+        /* Plan component for agent mode when orchestrator is not active */
+        mode === 'agent' && (activeToolCalls.size > 0 || (todoList && Object.values(todoList).some(category => category.length > 0))) && (
+          <div className="w-96 p-4 flex items-center">
+            <div className="rounded-xl border border-gray-200 bg-white w-full">
+              <PlanComponent todoList={todoList} />
+            </div>
+          </div>
+        )
       )}
     </div>
   );
