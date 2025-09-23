@@ -3,7 +3,7 @@ SCOUT Backend - Main FastAPI Application
 AI system that takes business plans and outputs GO/NO-GO decisions with comprehensive market intelligence reports.
 """
 
-from fastapi import FastAPI, HTTPException, UploadFile, File, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, HTTPException, UploadFile, File, WebSocket, WebSocketDisconnect, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, StreamingResponse
 import uvicorn
@@ -129,6 +129,21 @@ class ConnectionManager:
 
 manager = ConnectionManager()
 
+# Webhook endpoint for orchestrator events
+@app.post("/api/orchestrator/events")
+async def receive_orchestrator_event(request: Request):
+    """Receive orchestrator events via HTTP webhook and broadcast to WebSocket clients"""
+    try:
+        event_data = await request.json()
+        
+        # Broadcast to all connected WebSocket clients
+        await manager.broadcast(json.dumps(event_data))
+        
+        return {"status": "success", "message": "Event received and broadcasted"}
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail="Failed to process event")
+
 # Health check endpoint
 @app.get("/")
 async def root():
@@ -232,18 +247,29 @@ async def websocket_endpoint(websocket: WebSocket, analysis_id: str):
     await manager.connect(websocket)
     try:
         while True:
-            # Keep connection alive and send periodic updates
+            await asyncio.sleep(60)  # Just keep connection alive
+    except WebSocketDisconnect:
+        manager.disconnect(websocket)
+
+# WebSocket endpoint for orchestrator events
+@app.websocket("/ws/orchestrator")
+async def orchestrator_websocket_endpoint(websocket: WebSocket):
+    """WebSocket endpoint for real-time orchestrator events"""
+    await manager.connect(websocket)
+    try:
+        # Send initial connection confirmation
+        await manager.send_personal_message(
+            json.dumps({
+                "type": "connection_established",
+                "message": "Connected to orchestrator events stream",
+                "timestamp": datetime.now().isoformat()
+            }),
+            websocket
+        )
+        
+        # Keep connection alive
+        while True:
             await asyncio.sleep(1)
-            # TODO: Send actual progress updates from agents
-            await manager.send_personal_message(
-                json.dumps({
-                    "type": "progress_update",
-                    "analysis_id": analysis_id,
-                    "timestamp": datetime.now().isoformat(),
-                    "message": "Processing business plan..."
-                }),
-                websocket
-            )
     except WebSocketDisconnect:
         manager.disconnect(websocket)
 

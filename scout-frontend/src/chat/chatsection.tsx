@@ -109,8 +109,9 @@ const ChatSection: React.FC<ChatSectionProps> = ({
         </div>
         
         {/* Floating bottom chat input */}
-        <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-white via-white to-transparent p-6 pb-2">
-          <div className="max-w-2xl mx-auto">
+        <div className="absolute bottom-0 left-0 right-0 p-6 pb-2">
+          <div className="max-w-2xl mx-auto relative">
+            <div className="absolute inset-0 bg-gradient-to-t from-white via-white to-transparent -z-10"></div>
             <ChatInput 
               onSendMessage={onSendMessage} 
               disabled={isLoading} 

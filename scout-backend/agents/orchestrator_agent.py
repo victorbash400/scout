@@ -1,6 +1,7 @@
 import os
 import asyncio
 import logging
+import json
 from typing import AsyncGenerator, Dict, List
 from strands import Agent, tool
 from strands.multiagent.a2a import A2AServer
@@ -15,6 +16,47 @@ logger = logging.getLogger(__name__)
 # Global storage for received plans and coordination state
 received_plans_storage: List[Dict] = []
 coordination_status: Dict[str, str] = {}
+
+class OrchestratorEventHandler:
+    """Custom callback handler to capture orchestrator events and send to main.py via HTTP"""
+    
+    def __init__(self):
+        self.webhook_url = "http://localhost:8000/api/orchestrator/events"
+        logger.info("✅ Orchestrator event handler initialized with webhook")
+    
+    def __call__(self, **kwargs):
+        """Send only final orchestrator messages to frontend"""
+        try:
+            # Only send final complete response
+            if 'result' in kwargs:
+                event_data = {
+                    "type": "orchestrator_message",
+                    "message": str(kwargs['result']),
+                    "timestamp": asyncio.get_event_loop().time() if asyncio.get_event_loop().is_running() else 0
+                }
+                
+                # Send HTTP POST to main.py webhook (non-blocking)
+                import threading
+                import requests
+                
+                def send_webhook():
+                    try:
+                        response = requests.post(
+                            self.webhook_url, 
+                            json=event_data, 
+                            timeout=5.0
+                        )
+                        if response.status_code != 200:
+                            logger.error(f"Webhook failed: {response.status_code}")
+                    except Exception as e:
+                        pass
+                
+                # Send in background thread to avoid blocking the agent
+                threading.Thread(target=send_webhook, daemon=True).start()
+                
+        except Exception as e:
+            logger.error(f"Error in orchestrator callback handler: {e}")
+            logger.error(f"Kwargs were: {kwargs}")
 
 @tool
 def store_research_plan(plan_data: str, source_agent: str = "Unknown") -> str:
@@ -160,7 +202,8 @@ class OrchestratorAgent:
                 store_research_plan, 
                 get_coordination_status, 
                 update_coordination_status
-            ] + a2a_tools
+            ] + a2a_tools,
+            callback_handler=OrchestratorEventHandler()  # ADD CALLBACK HANDLER
         )
         
         logger.info(f"✅ Orchestrator Agent initialized with {settings.bedrock_model_id}")
