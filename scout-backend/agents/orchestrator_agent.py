@@ -28,17 +28,19 @@ def mock_tool(task_name: str) -> str:
     return f"Task '{task_name}' processed (mock)."
 
 # ------------------------
-# Callback Handler
+# Improved Callback Handler
 # ------------------------
 class OrchestratorCallbackHandler:
-    """Robust callback that sends each tool call and final response to the frontend via main.py webhook."""
-    def __init__(self, webhook_url: str = "http://localhost:8000/api/orchestrator/events", min_interval: float = 0.05):
+    """Improved callback that properly handles streaming and tool events separately."""
+    
+    def __init__(self, webhook_url: str = "http://localhost:8000/api/orchestrator/events"):
         self.webhook_url = webhook_url
-        self.min_interval = min_interval
-        self._last_sent_ts = 0.0
-        self._last_msg = None
+        self._current_tool_call = None
+        self._text_buffer = ""
+        self._in_tool_call = False
 
     def _post(self, payload: dict):
+        """Send webhook payload in background thread"""
         def _do():
             try:
                 requests.post(self.webhook_url, json=payload, timeout=5)
@@ -46,61 +48,112 @@ class OrchestratorCallbackHandler:
                 logger.debug(f"Webhook POST failed: {e}")
         threading.Thread(target=_do, daemon=True).start()
 
+    def _send_event(self, event_type: str, message: str, extra_data: dict = None):
+        """Send a single event to the webhook"""
+        payload = {
+            "type": "orchestrator_message",
+            "event": event_type,
+            "message": message,
+            "extra": extra_data or {},
+            "timestamp": datetime.utcnow().isoformat()
+        }
+        self._post(payload)
+
     def __call__(self, **kwargs):
         try:
-            now = time.time()
-            tool_name = kwargs.get("tool_name") or kwargs.get("tool")
-            tool_args = kwargs.get("tool_input") or kwargs.get("tool_args")
-            message = None
-            event_kind = None
-
-            # Detect tool events
-            if tool_name:
-                message = f"Using {tool_name}..."
-                event_kind = "tool"
-
-            # Detect streaming / delta fragments
-            elif 'delta' in kwargs or 'text' in kwargs or 'content' in kwargs:
-                delta = kwargs.get('delta') or kwargs.get('text') or kwargs.get('content')
-                if isinstance(delta, dict):
-                    message = delta.get('text') or str(delta)
-                else:
-                    message = str(delta)
-                event_kind = "intermediate"
-
-            # Detect final/completion result messages
-            elif 'result' in kwargs or 'message' in kwargs:
-                message = kwargs.get('result') or kwargs.get('message')
-                event_kind = "final_response"
-
-            else:
+            # Handle different event types from Strands streaming
+            event_type = kwargs.get("event_type")
+            
+            # Tool call start
+            if "tool_use" in kwargs or (event_type and "toolUse" in str(event_type)):
+                tool_name = self._extract_tool_name(kwargs)
+                if tool_name and not self._in_tool_call:
+                    self._in_tool_call = True
+                    self._current_tool_call = tool_name
+                    self._send_event(
+                        "tool_start",
+                        f"Using {tool_name}...",
+                        {"tool_name": tool_name}
+                    )
                 return
 
-            if not message:
+            # Tool call result/end
+            elif "toolResult" in str(kwargs) or (self._in_tool_call and "result" in kwargs):
+                if self._current_tool_call:
+                    result = kwargs.get("result") or "Tool execution completed"
+                    self._send_event(
+                        "tool_end",
+                        f"✓ {self._current_tool_call} completed",
+                        {
+                            "tool_name": self._current_tool_call,
+                            "result": str(result)
+                        }
+                    )
+                    self._current_tool_call = None
+                    self._in_tool_call = False
                 return
 
-            # Throttle duplicates
-            if message == self._last_msg and (now - self._last_sent_ts) < self.min_interval:
-                return
-
-            payload = {
-                "type": "orchestrator_message",
-                "event": event_kind,
-                "message": str(message),
-                "extra": {
-                    "tool_name": tool_name,
-                    "tool_args": tool_args,
-                    "source_event_type": kwargs.get("event_type")
-                },
-                "timestamp": datetime.utcnow().isoformat()
-            }
-
-            self._post(payload)
-            self._last_msg = message
-            self._last_sent_ts = now
+            # Text streaming - handle deltas/fragments
+            elif not self._in_tool_call:
+                text_content = self._extract_text_content(kwargs)
+                if text_content:
+                    # Buffer small fragments, send larger chunks
+                    self._text_buffer += text_content
+                    
+                    # Send buffer when we have enough content or on sentence boundaries
+                    if (len(self._text_buffer) > 50 or 
+                        text_content.endswith(('.', '!', '?', '\n')) or
+                        "final" in str(kwargs).lower()):
+                        
+                        if self._text_buffer.strip():
+                            self._send_event(
+                                "text_stream",
+                                self._text_buffer.strip()
+                            )
+                            self._text_buffer = ""
 
         except Exception as e:
             logger.error(f"OrchestratorCallbackHandler error: {e}")
+
+    def _extract_tool_name(self, kwargs):
+        """Extract tool name from various event formats"""
+        # Direct tool name
+        if "tool_name" in kwargs:
+            return kwargs["tool_name"]
+        
+        # Tool use object
+        tool_use = kwargs.get("tool_use") or kwargs.get("toolUse")
+        if tool_use and isinstance(tool_use, dict):
+            return tool_use.get("name")
+        
+        # Check in nested structures
+        for key, value in kwargs.items():
+            if isinstance(value, dict) and "name" in value:
+                return value["name"]
+            if "tool" in key.lower() and isinstance(value, str):
+                return value
+        
+        return None
+
+    def _extract_text_content(self, kwargs):
+        """Extract text content from various event formats"""
+        # Direct text fields
+        for field in ["text", "content", "delta", "message"]:
+            if field in kwargs:
+                value = kwargs[field]
+                if isinstance(value, str):
+                    return value
+                elif isinstance(value, dict) and "text" in value:
+                    return value["text"]
+        
+        # Check nested structures
+        for key, value in kwargs.items():
+            if isinstance(value, dict):
+                for text_field in ["text", "content", "delta"]:
+                    if text_field in value:
+                        return str(value[text_field])
+        
+        return None
 
 # ------------------------
 # Orchestrator Agent
@@ -116,20 +169,24 @@ class OrchestratorAgent:
             os.environ['AWS_DEFAULT_REGION'] = settings.aws_region
         logger.info("✅ AWS credentials loaded")
 
-        # Agent setup
+        # Agent setup with improved callback
         self.agent = Agent(
             name="SCOUT Orchestrator",
             description="Orchestrator Agent for receiving plans from Planner and coordinating.",
             model=settings.bedrock_model_id,
             system_prompt="""
 You are the Orchestrator Agent. Your role:
+
 1. Receive research plans from the Planner Agent.
 2. Always call the mock_tool **twice** in each interaction:
+   - Before each tool call, explain what you are doing (e.g., "Let me call tool A to process the first phase")
    - First call simulates processing the first part of the plan.
    - Second call simulates processing the second part.
 3. Acknowledge receipt clearly and concisely.
 4. Provide final response to the Planner after calling mock_tool twice.
 5. Do not maintain complex state; focus on messaging, coordination, and tool usage.
+
+IMPORTANT: Explain your actions clearly before each tool call so users understand what's happening.
 """,
             tools=[mock_tool],
             callback_handler=OrchestratorCallbackHandler()
