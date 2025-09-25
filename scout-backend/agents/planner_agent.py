@@ -6,6 +6,7 @@ from strands import Agent, tool
 from dotenv import load_dotenv
 from config.settings import settings
 from agents.orchestrator_agent import run_orchestrator
+from agents.synthesis_agent import run_synthesis_agent
 
 load_dotenv()
 
@@ -16,9 +17,8 @@ logger = logging.getLogger(__name__)
 todo_list_storage: Dict[str, List[str]] = {
     "competition_tasks": [],
     "market_tasks": [],
-    "financial_tasks": [],
-    "risk_tasks": [],
-    "synthesis_requirements": []
+    "price_tasks": [],
+    "legal_tasks": []
 }
 
 @tool
@@ -27,14 +27,14 @@ def update_todo_list(category: str, tasks: List[str]) -> str:
     Update the research to-do list with tasks for a specific category.
     
     Args:
-        category: The agent category (competition_tasks, market_tasks, financial_tasks, risk_tasks, synthesis_requirements)
+        category: The agent category (competition_tasks, market_tasks, price_tasks, legal_tasks)
         tasks: List of tasks to add to this category
     
     Returns:
         A confirmation message with the number of tasks added
     """
     if category not in todo_list_storage:
-        return f"Invalid category: {category}. Valid categories are: competition_tasks, market_tasks, financial_tasks, risk_tasks, synthesis_requirements"
+        return f"Invalid category: {category}. Valid categories are: competition_tasks, market_tasks, price_tasks, legal_tasks"
     
     todo_list_storage[category].extend(tasks)
     return f"Added {len(tasks)} tasks to {category}. Total tasks in this category: {len(todo_list_storage[category])}"
@@ -49,6 +49,11 @@ def execute_research_plan() -> str:
     logger.info("Executing research plan...")
     result = run_orchestrator(todo_list_storage)
     return f"Orchestrator finished with result: {result}"
+
+@tool
+def run_synthesis_agent_tool() -> str:
+    """Calls the Synthesis Agent to compile the final report."""
+    return run_synthesis_agent()
 
 class PlannerAgent:
     def __init__(self):
@@ -75,48 +80,22 @@ class PlannerAgent:
             - Focus on being helpful and informative without structured task creation
             
             AGENT MODE:
-            1. Analyze the business plan and identify key areas for research
-            2. Create a structured to-do list with specific tasks for different specialist agents
-            3. BEFORE calling EACH update_todo_list tool, EXPLAIN to the user:
-               - What specific tasks you're about to add
-               - Why these tasks are important for the research plan
-               - Which category they belong to
-            4. Then use the update_todo_list tool to add tasks to the appropriate category and repeat for each tool call
-            5. After completing the plan, ask the user if they are satisfied with the plan and if you should send the plan to the orchestrator.
-            6. If user confirms, BEFORE calling the execute_research_plan tool, EXPLAIN to the user:
-               - What you're about to send to the orchestrator
-               - Why you're sending it now
-               - What the orchestrator will do with it
-            7. Then use the execute_research_plan tool to send the complete plan to the orchestrator.
-               
-            The to-do list categories are:
-            - competition_tasks: Direct competitor analysis, pricing intelligence, market positioning, financial intelligence
-            - market_tasks: Customer demographics, market sizing, demand validation, geographic analysis
-            - financial_tasks: Unit economics modeling, pricing strategy, financial projections, investment analysis
-            - risk_tasks: Regulatory compliance, market risks, operational risks, competitive threats, strategic risks
-            - synthesis_requirements: Executive summary, strategic recommendations, visual intelligence
+            1. Analyze the business plan and identify key areas for research.
+            2. For each research category, first explain to the user why you are adding tasks for that category, and then use the `update_todo_list` tool to add the tasks. You must follow this explain-then-call pattern for each category.
+            3. After creating the plan, ask the user for confirmation to proceed.
+            4. Once the user confirms, your first action is to call the `execute_research_plan` tool to have the orchestrator contact the specialist agents.
+            5. After the `execute_research_plan` tool returns successfully, your final action is to call the `run_synthesis_agent_tool` to compile the final report.
+            6. Explain each major step to the user before you take it (e.g., "I will now call the orchestrator...", "The orchestrator is done, now I will call the synthesis agent...").
+
+            The to-do list categories you can use are:
+            - competition_tasks: For analyzing competitors.
+            - market_tasks: For understanding the market and customers.
+            - price_tasks: For all pricing-related research.
+            - legal_tasks: For regulatory and compliance research.
             
-            You will be told which mode you are in at the beginning of each conversation.
-            In CHAT MODE, do NOT create research plans or call tools.
-            In AGENT MODE, follow the structured research plan creation process.
-            
-            Example interaction in AGENT MODE:
-            User: "I have a food delivery business plan"
-            Assistant: "I'll analyze this plan and create research tasks. Let me first identify the key competitors we should research."
-            Assistant: "let me  add competitor analysis tasks to the competition_tasks category because understanding the competitive landscape is crucial for your market entry strategy."
-            Assistant: [Tool call to update_todo_list with competition tasks]
-            Assistant: "Now I'll focus on market sizing since we need to understand the total addressable market for your service."
-            Assistant: [Tool call to update_todo_list with market sizing tasks]
-            ... (after plan is complete)
-            Assistant: "I have completed the research plan. Are you satisfied with it and should I send it to the orchestrator to begin execution?"
-            User: "Yes, looks good. Go ahead."
-            Assistant: "Great. I am now sending the plan to the orchestrator. The orchestrator will now execute the research tasks by using specialist agents. You will see the progress in the right panel."
-            Assistant: [Tool call to execute_research_plan]
-            
-            Keep answers concise and focused on creating a comprehensive research plan in AGENT MODE.
-            Always explain your reasoning before calling tools in AGENT MODE.
+            Follow the AGENT MODE workflow strictly. Your job is to create the plan and then orchestrate the two main tool calls (`execute_research_plan`, then `run_synthesis_agent_tool`).
             """,
-            tools=[update_todo_list, execute_research_plan]
+            tools=[update_todo_list, execute_research_plan, run_synthesis_agent_tool]
         )
         self.document_context = None  # For attached file context
         print(f"✅ Planner Agent initialized with {settings.bedrock_model_id}")

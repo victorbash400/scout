@@ -1,12 +1,22 @@
 import os
 import logging
 from typing import List, Dict
+from dotenv import load_dotenv
+
+load_dotenv()
+
 from strands import Agent, tool
 from config.settings import settings
+
+from agents.competition_agent import run_competition_agent
+from agents.market_agent import run_market_agent
+from agents.price_agent import run_price_agent
+from agents.legal_agent import run_legal_agent
 
 # ------------------------
 # Setup
 # ------------------------
+import logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -31,6 +41,29 @@ def add_step_to_orchestrator_log(step_description: str) -> str:
     logger.info(f"Orchestrator step logged: {step_description}")
     return f"Step logged: {step_description}"
 
+# ------------------------
+# Specialist Agent Tools
+# ------------------------
+@tool
+def competition_agent_tool(tasks: List[str]) -> str:
+    """Delegates competition-related tasks to the Competition Agent."""
+    return run_competition_agent(tasks)
+
+@tool
+def market_agent_tool(tasks: List[str]) -> str:
+    """Delegates market-related tasks to the Market Agent."""
+    return run_market_agent(tasks)
+
+@tool
+def price_agent_tool(tasks: List[str]) -> str:
+    """Delegates price-related tasks to the Price Agent."""
+    return run_price_agent(tasks)
+
+@tool
+def legal_agent_tool(tasks: List[str]) -> str:
+    """Delegates legal-related tasks to the Legal Agent."""
+    return run_legal_agent(tasks)
+
 def get_orchestrator_steps() -> List[Dict[str, str]]:
     """
     Returns the current list of orchestrator steps.
@@ -47,6 +80,7 @@ def clear_orchestrator_steps():
 # ------------------------
 # Orchestrator Agent
 # ------------------------
+
 class OrchestratorAgent:
     def __init__(self):
         # Load AWS credentials (optional)
@@ -59,26 +93,25 @@ class OrchestratorAgent:
         
         self.agent = Agent(
             name="SCOUT Orchestrator",
-            description="Orchestrator Agent for executing research plans.",
+            description="Orchestrator Agent for delegating tasks to specialist agents.",
             model=settings.bedrock_model_id,
-            system_prompt="""You are the Orchestrator Agent. Your role is to demonstrate the execution of a research plan by narrating your actions in a conversational way.
+            system_prompt="""You are the Orchestrator Agent. Your job is to coordinate a team of specialist agents.
 
-1.  You will be given a research plan as a JSON object.
-2.  Your only job is to log the steps you are taking, one by one, using the `add_step_to_orchestrator_log` tool.
-3.  Use a conversational, slightly informal tone. Explain what you're doing as if you're an assistant reporting on your progress.
-4.  You must call the `add_step_to_orchestrator_log` tool for every single step.
-
-Example of the sequence of tool calls and conversational tone:
-1.  `add_step_to_orchestrator_log("Alright, let's get this research started. I'll begin the coordination now.")`
-2.  `add_step_to_orchestrator_log("First up, let's look at the competition. Kicking off the competition tasks.")`
-3.  `add_step_to_orchestrator_log("Now, I'll dig into Competitor A's pricing strategy.")`
-4.  `add_step_to_orchestrator_log("Next, I'll analyze Competitor B's market share.")`
-5.  `add_step_to_orchestrator_log("Okay, that's a wrap on the competition analysis.")`
-6.  `add_step_to_orchestrator_log("Moving on to the market research phase.")`
-7.  ...and so on.
-8.  `add_step_to_orchestrator_log("And that's it! The full research plan has been executed.")`
+1.  You will be given a research plan as a JSON object with keys like `competition_tasks`, `market_tasks`, etc.
+2.  Your role is to perform a "roll call" by contacting each specialist agent that has tasks assigned to it in the plan.
+3.  For each category in the plan, you must perform this single, consolidated step:
+    a.  Simultaneously call the `add_step_to_orchestrator_log` tool to log your action **AND** call the corresponding specialist agent tool (`market_agent_tool`, `competition_agent_tool`, etc.), passing the list of tasks to it.
+    b.  The log message should be brief and descriptive (e.g., "Contacting the Market Agent and delegating tasks.").
+4.  Repeat this for all categories present in the plan.
+5.  After all agents have been contacted, hand back to the Planner.
 """,
-            tools=[add_step_to_orchestrator_log],
+            tools=[
+                add_step_to_orchestrator_log,
+                competition_agent_tool,
+                market_agent_tool,
+                price_agent_tool,
+                legal_agent_tool
+            ],
         )
         logger.info(f"✅ Orchestrator Agent initialized with {settings.bedrock_model_id}")
 

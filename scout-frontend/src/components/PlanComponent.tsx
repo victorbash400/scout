@@ -4,9 +4,8 @@ import { ChevronDown, ChevronRight, CheckCircle2, Circle, Target } from 'lucide-
 interface TodoList {
   competition_tasks: string[];
   market_tasks: string[];
-  financial_tasks: string[];
-  risk_tasks: string[];
-  synthesis_requirements: string[];
+  price_tasks: string[];
+  legal_tasks: string[];
 }
 
 interface CategoryProps {
@@ -17,8 +16,7 @@ interface CategoryProps {
 
 const Category: React.FC<CategoryProps> = ({ title, tasks, defaultExpanded = false }) => {
   const [isExpanded, setIsExpanded] = useState(defaultExpanded);
-  
-  if (tasks.length === 0) return null;
+  if (!Array.isArray(tasks) || tasks.length === 0) return null;
 
   return (
     <div className="mb-3">
@@ -77,16 +75,12 @@ const PlanComponent: React.FC<PlanComponentProps> = ({ todoList }) => {
               tasks={todoList.market_tasks} 
             />
             <Category 
-              title="Financial Analysis" 
-              tasks={todoList.financial_tasks} 
+              title="Price Analysis" 
+              tasks={todoList.price_tasks} 
             />
             <Category 
-              title="Risk Assessment" 
-              tasks={todoList.risk_tasks} 
-            />
-            <Category 
-              title="Synthesis Requirements" 
-              tasks={todoList.synthesis_requirements} 
+              title="Legal & Regulatory" 
+              tasks={todoList.legal_tasks} 
             />
           </div>
         ) : (

@@ -1,5 +1,3 @@
-"SCOUT Backend - Main FastAPI Application\nAI system that takes business plans and outputs GO/NO-GO decisions with comprehensive market intelligence reports."
-
 from fastapi import FastAPI, HTTPException, UploadFile, File, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse

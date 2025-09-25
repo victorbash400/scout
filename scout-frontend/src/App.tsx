@@ -25,6 +25,8 @@ interface TodoList {
   financial_tasks: string[];
   risk_tasks: string[];
   synthesis_requirements: string[];
+  price_tasks: string[];
+  legal_tasks: string[];
 }
 
 interface ChatSession {
@@ -328,16 +330,11 @@ function App() {
   if (!hasStarted) {
     return (
       <div className="h-screen flex flex-col items-center justify-center relative" style={{backgroundColor: '#fdfdf1'}}>
-        <div className="absolute top-6 left-6 flex items-center gap-3">
-          <img src="/scout-favicon.svg" alt="Scout" className="w-8 h-8" />
-          <h1 className="text-2xl font-light text-gray-800">Scout</h1>
-        </div>
-        
+        {/* Scout icon and word removed in welcome mode */}
         <div className="w-full max-w-2xl px-6">
           <div className="text-center mb-8">
             <p className="text-2xl text-gray-700 font-medium">{getTimeBasedGreeting()}</p>
           </div>
-          
           <ChatInput {...chatInputProps} />
         </div>
       </div>

@@ -23,6 +23,8 @@ interface TodoList {
   financial_tasks: string[];
   risk_tasks: string[];
   synthesis_requirements: string[];
+  price_tasks: string[];
+  legal_tasks: string[];
 }
 
 interface ChatSectionProps {
