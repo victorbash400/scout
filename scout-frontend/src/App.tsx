@@ -39,9 +39,10 @@ function App() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [hasStarted, setHasStarted] = useState(false);
-  const [mode, setMode] = useState<'chat' | 'agent'>('chat'); // Add mode state
-  const [todoList, setTodoList] = useState<TodoList | null>(null); // Add to-do list state
-  const [activeToolCalls, setActiveToolCalls] = useState<Set<string>>(new Set()); // Track active tool calls
+  const [mode, setMode] = useState<'chat' | 'agent'>('chat');
+  const [todoList, setTodoList] = useState<TodoList | null>(null);
+  const [activeToolCalls, setActiveToolCalls] = useState<Set<string>>(new Set());
+  const [isOrchestratorActive, setIsOrchestratorActive] = useState(false);
 
   // New state for file handling
   const [attachedFile, setAttachedFile] = useState<File | null>(null);
@@ -88,8 +89,7 @@ function App() {
       }
     } catch (error) {
       console.error('Error uploading or processing file:', error);
-      // Optionally, display an error to the user in the UI
-      setAttachedFile(null); // Clear the attachment on error
+      setAttachedFile(null);
     } finally {
       setIsProcessingFile(false);
     }
@@ -106,14 +106,11 @@ function App() {
     }
   };
 
-  // Generate a unique 6-character chat ID
   const generateChatId = () => {
     return Math.random().toString(36).substring(2, 8).toUpperCase();
   };
 
-  // Start a new chat session
   const startNewChat = async () => {
-    // Save current chat session if it exists
     if (currentChatId && messages.length > 0) {
       const updatedSessions = chatSessions.map(session => 
         session.id === currentChatId ? { ...session, messages } : session
@@ -121,14 +118,13 @@ function App() {
       setChatSessions(updatedSessions);
     }
 
-    // Clear current messages and file context
     setMessages([]);
     setAttachedFile(null);
     setFileContext(null);
     setHasStarted(false);
-    setTodoList(null); // Clear to-do list
+    setTodoList(null);
+    setIsOrchestratorActive(false);
     
-    // Clear backend context
     try {
       await fetch('http://localhost:8000/api/context/clear', { method: 'POST' });
       console.log('Backend context cleared for new chat.');
@@ -136,11 +132,9 @@ function App() {
       console.error('Failed to clear backend context:', error);
     }
 
-    // Create new chat session
     const newChatId = generateChatId();
     setCurrentChatId(newChatId);
     
-    // Add to chat sessions
     const newSession: ChatSession = {
       id: newChatId,
       messages: [],
@@ -149,7 +143,6 @@ function App() {
     setChatSessions(prev => [...prev, newSession]);
   };
 
-  // Fetch to-do list from backend
   const fetchTodoList = async () => {
     try {
       const response = await fetch('http://localhost:8000/api/plan/todo');
@@ -163,11 +156,9 @@ function App() {
     }
   };
 
-  // Handle mode change
   const handleModeChange = (newMode: 'chat' | 'agent') => {
     setMode(newMode);
     if (newMode === 'agent') {
-      // Fetch to-do list when switching to agent mode
       fetchTodoList();
     }
   };
@@ -179,11 +170,8 @@ function App() {
     
     setIsLoading(true);
 
-    // For the message content, we don't need to include the file prefix since
-    // we're showing it visually in the chat bubble
     let messageToSend = content;
 
-    // Add user message with file attachment info
     const userMessage: Message = {
       role: 'user',
       content: messageToSend,
@@ -195,11 +183,8 @@ function App() {
     };
     setMessages((prev) => [...prev, userMessage]);
 
-    // Clear the file attachment UI but keep backend context for multi-turn conversations
-    // Only clear the attachment UI, not the backend context
     setAttachedFile(null);
 
-    // Add empty assistant message that we'll update with streaming content
     const aiMessage: Message = {
       role: 'assistant',
       content: '',
@@ -208,13 +193,11 @@ function App() {
     setMessages((prev) => [...prev, aiMessage]);
 
     try {
-      // Call the streaming backend planner agent
       const response = await fetch('http://localhost:8000/api/chat/stream', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        // The backend will use the context set during the file upload
         body: JSON.stringify({ message: content, mode: mode }),
       });
 
@@ -242,13 +225,12 @@ function App() {
 
         buffer += decoder.decode(value, { stream: true });
         const lines = buffer.split('\n');
-        buffer = lines.pop() || ''; // Keep the last incomplete line in buffer
+        buffer = lines.pop() || '';
 
         for (const line of lines) {
           if (line.startsWith('data: ')) {
-            const data = line.slice(6); // Remove 'data: ' prefix
+            const data = line.slice(6);
             if (data === '[DONE]') {
-              // Fetch updated to-do list when streaming is complete
               if (mode === 'agent') {
                 fetchTodoList();
               }
@@ -269,6 +251,9 @@ function App() {
                 });
               } else if (parsed.tool_start) {
                 const { tool_name, tool_use_id, content_block_index } = parsed.tool_start;
+                if (tool_name === 'execute_research_plan') {
+                  setIsOrchestratorActive(true);
+                }
                 const toolMessage: Message = {
                   role: 'assistant',
                   content: '',
@@ -280,10 +265,15 @@ function App() {
                 };
                 setMessages((prev) => [...prev, toolMessage]);
                 
-                // Add to active tool calls
                 setActiveToolCalls(prev => new Set(prev).add(tool_use_id || ''));
               } else if (parsed.tool_end) {
                 const { tool_use_id, content_block_index } = parsed.tool_end;
+                
+                const startMessage = messages.find(msg => msg.tool_use_id === tool_use_id);
+                if (startMessage && startMessage.tool_name === 'execute_research_plan') {
+                  setIsOrchestratorActive(false);
+                }
+
                 setMessages((prev) =>
                   prev.map((msg) => {
                     if (msg.tool_use_id === tool_use_id) {
@@ -293,14 +283,12 @@ function App() {
                   })
                 );
                 
-                // Remove from active tool calls
                 setActiveToolCalls(prev => {
                   const newSet = new Set(prev);
                   newSet.delete(tool_use_id || '');
                   return newSet;
                 });
                 
-                // Fetch updated to-do list when a tool call completes
                 if (mode === 'agent') {
                   fetchTodoList();
                 }
@@ -313,7 +301,6 @@ function App() {
       }
     } catch (error) {
       console.error('Error calling planner agent:', error);
-      // Update the last message with error content
       setMessages((prev) =>
         prev.map((msg, index) => {
           if (index === prev.length - 1 && msg.role === 'assistant') {
@@ -339,17 +326,14 @@ function App() {
   };
 
   if (!hasStarted) {
-    // Welcome page with centered ChatInput
     return (
       <div className="h-screen flex flex-col items-center justify-center relative" style={{backgroundColor: '#fdfdf1'}}>
-        {/* Logo and title in top left */}
         <div className="absolute top-6 left-6 flex items-center gap-3">
           <img src="/scout-favicon.svg" alt="Scout" className="w-8 h-8" />
           <h1 className="text-2xl font-light text-gray-800">Scout</h1>
         </div>
         
         <div className="w-full max-w-2xl px-6">
-          {/* Time-based greeting */}
           <div className="text-center mb-8">
             <p className="text-2xl text-gray-700 font-medium">{getTimeBasedGreeting()}</p>
           </div>
@@ -360,10 +344,8 @@ function App() {
     );
   }
 
-  // Chat mode with messages
   return (
     <div className="h-screen relative" style={{backgroundColor: '#fdfdf1'}}>
-      {/* Logo and title in top left */}
       <div className="absolute top-6 left-6 flex items-center gap-3 z-30">
         <img src="/scout-favicon.svg" alt="Scout" className="w-6 h-6" />
         <h1 className="text-2xl font-light text-gray-800">Scout</h1>
@@ -381,6 +363,7 @@ function App() {
         mode={mode}
         todoList={todoList}
         activeToolCalls={activeToolCalls}
+        isOrchestratorActive={isOrchestratorActive}
       />
     </div>
   )

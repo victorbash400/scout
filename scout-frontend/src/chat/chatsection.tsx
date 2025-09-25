@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useState } from 'react';
+import React, { useRef, useEffect } from 'react';
 import ChatBubble from './chatbubble';
 import ChatInput from './chatinput';
 import PlanComponent from '../components/PlanComponent';
@@ -36,6 +36,7 @@ interface ChatSectionProps {
   mode?: 'chat' | 'agent';
   todoList?: TodoList | null;
   activeToolCalls?: Set<string>;
+  isOrchestratorActive?: boolean;
 }
 
 const ChatSection: React.FC<ChatSectionProps> = ({
@@ -49,19 +50,9 @@ const ChatSection: React.FC<ChatSectionProps> = ({
   mode = 'chat',
   todoList = null,
   activeToolCalls = new Set(),
+  isOrchestratorActive = false,
 }) => {
   const chatContainerRef = useRef<HTMLDivElement>(null);
-  const [showOrchestrator, setShowOrchestrator] = useState(false);
-
-  // Check if orchestrator should be shown based on messages
-  useEffect(() => {
-    const shouldShowOrchestrator = messages.some(msg => 
-      msg.content.toLowerCase().includes('orchestrator') || 
-      msg.content.toLowerCase().includes('send to orchestrator') ||
-      msg.content.toLowerCase().includes('plan sent to orchestrator')
-    );
-    setShowOrchestrator(shouldShowOrchestrator);
-  }, [messages]);
 
   // Auto-scroll to bottom when messages change
   useEffect(() => {
@@ -126,10 +117,10 @@ const ChatSection: React.FC<ChatSectionProps> = ({
       </div>
       
       {/* Show Orchestrator component when orchestrator is active, otherwise show Plan component */}
-      {showOrchestrator ? (
+      {isOrchestratorActive ? (
         <div className="w-96 p-4 flex items-center">
           <div className="rounded-xl border border-gray-200 bg-white w-full">
-            <OrchestratorComponent isActive={showOrchestrator} />
+            <OrchestratorComponent isActive={isOrchestratorActive} />
           </div>
         </div>
       ) : (
