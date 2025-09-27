@@ -1,5 +1,6 @@
 import os
 import logging
+import re
 from typing import List, Dict
 from dotenv import load_dotenv
 
@@ -16,7 +17,6 @@ from agents.legal_agent import run_legal_agent
 # ------------------------
 # Setup
 # ------------------------
-import logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -40,6 +40,22 @@ def add_step_to_orchestrator_log(step_description: str) -> str:
     orchestrator_steps_storage.append({"step": step_description})
     logger.info(f"Orchestrator step logged: {step_description}")
     return f"Step logged: {step_description}"
+
+@tool
+def extract_filepath(confirmation_message: str) -> str:
+    """
+    Extracts a file path from a confirmation message.
+
+    Args:
+        confirmation_message: The message to extract the path from.
+    
+    Returns:
+        The extracted file path.
+    """
+    match = re.search(r"reports/[\w_]+\.md", confirmation_message)
+    if match:
+        return match.group(0)
+    return ""
 
 # ------------------------
 # Specialist Agent Tools
@@ -102,31 +118,35 @@ class OrchestratorAgent:
 3.  For each category in the plan, you must perform this single, consolidated step:
     a.  Simultaneously call the `add_step_to_orchestrator_log` tool to log your action **AND** call the corresponding specialist agent tool (`market_agent_tool`, `competition_agent_tool`, etc.), passing the list of tasks to it.
     b.  The log message should be brief and descriptive (e.g., "Contacting the Market Agent and delegating tasks.").
-4.  Repeat this for all categories present in the plan.
-5.  After all agents have been contacted, hand back to the Planner.
+4.  After calling the specialist agent, it will return a confirmation message containing the file path of the report it generated.
+5.  Use the `extract_filepath` tool to get the file path from the confirmation message.
+6.  Collect all the file paths.
+7.  After all agents have been contacted, your final output should be a list of all the collected file paths.
 """,
             tools=[
                 add_step_to_orchestrator_log,
                 competition_agent_tool,
                 market_agent_tool,
                 price_agent_tool,
-                legal_agent_tool
+                legal_agent_tool,
+                extract_filepath
             ],
         )
         logger.info(f"✅ Orchestrator Agent initialized with {settings.bedrock_model_id}")
 
-    def run(self, plan: Dict[str, List[str]]) -> str:
+    def run(self, plan: Dict[str, List[str]]) -> List[str]:
         """
         Runs the orchestration process on a given plan.
         """
         plan_str = str(plan)
         response = self.agent(f"Execute the following research plan: {plan_str}")
-        return str(response.message)
+        # The response should be a list of file paths
+        return response.message
 
 # ------------------------
 # Main Orchestrator Function (to be used as a tool)
 # ------------------------
-def run_orchestrator(plan: Dict[str, List[str]]) -> str:
+def run_orchestrator(plan: Dict[str, List[str]]) -> List[str]:
     """
     This function is the entry point for the orchestrator agent.
     It takes a research plan, runs the orchestrator agent, and returns the result.

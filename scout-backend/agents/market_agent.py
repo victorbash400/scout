@@ -8,6 +8,7 @@ from concurrent.futures import ThreadPoolExecutor, TimeoutError
 
 from strands import Agent, tool
 from config.settings import settings
+from strands_tools import file_write
 
 # Load environment variables from .env file
 load_dotenv()
@@ -267,6 +268,8 @@ class MarketAgent:
            - Supplier Cost Analysis (from tool 3)
            - Strategic Recommendations
         
+        5. **Save the report:** Use the `file_write` tool to save the final report to a file named `market_report.md` in the `reports/` directory.
+
         CRITICAL: When including sources , you MUST preserve the exact URLs returned by each tool. Do NOT rewrite or summarize the source URLs. If a tool returns "**Sources:**" followed by URLs, copy those URLs exactly as provided. Do not create generic source descriptions - use the actual clickable URLs.
         
         Always explain what you're doing before calling each tool. Be systematic and thorough."""
@@ -279,7 +282,8 @@ class MarketAgent:
                 tools=[
                     analyze_product_pricing,
                     analyze_local_economy,
-                    analyze_supplier_costs
+                    analyze_supplier_costs,
+                    file_write
                 ]
             )
             logger.info("✅ Market Agent initialized successfully.")
@@ -304,7 +308,7 @@ class MarketAgent:
             prompt = (
                 f"I need a comprehensive market analysis for opening a '{business_type}' in '{area}'. "
                 f"Start by analyzing the pricing for {product_example}, then examine the local economy, "
-                f"followed by supplier costs. Create a detailed report with all findings and sources."
+                f"followed by supplier costs. Create a detailed report with all findings and sources, and then save it to a file."
             )
             
             logger.info(f"Starting market analysis for '{business_type}' in '{area}'")

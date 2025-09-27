@@ -7,6 +7,7 @@ load_dotenv()
 
 from strands import Agent
 from strands_tools.tavily import tavily_search
+from strands_tools import file_write
 
 class PriceAgent:
     def __init__(self):
@@ -29,14 +30,16 @@ You are a meticulous Pricing Strategy Analyst. Your mission is to generate a pri
 2. **Call `tavily_search`:** Use this tool to get competitor pricing and market data for the specified business type, products, and location.
 3. **State the next step.** After getting the search results, explain how you will use this information to recommend a pricing strategy.
 4. **Synthesize the Final Recommendation:** Combine the information from the tool into a single, comprehensive final answer. The report should include a summary of competitor prices, your recommended pricing strategy (e.g., competitive, premium, penetration), and clear reasoning. Always cite sources when possible.
+5.  **Save the report:** Use the `file_write` tool to save the final report to a file named `price_report.md` in the `reports/` directory.
             """,
-            tools=[tavily_search]
+            tools=[tavily_search, file_write]
         )
 
     def run(self, tasks: List[str]) -> str:
         """Runs the agent with the given tasks, letting the system prompt control the process."""
         task_str = ", ".join(tasks)
-        response = self.agent(task_str)
+        prompt = f"{task_str}. Save the final report to a file."
+        response = self.agent(prompt)
         return str(response.message)
 
 # Create a global instance of the agent

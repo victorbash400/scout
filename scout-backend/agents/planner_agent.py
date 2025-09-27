@@ -21,6 +21,9 @@ todo_list_storage: Dict[str, List[str]] = {
     "legal_tasks": []
 }
 
+# Global storage for report file paths
+report_filepaths_storage: List[str] = []
+
 @tool
 def update_todo_list(category: str, tasks: List[str]) -> str:
     """
@@ -45,15 +48,17 @@ def execute_research_plan() -> str:
     Executes the research plan by calling the orchestrator agent.
     This should be called after the user has approved the plan.
     """
-    global todo_list_storage
+    global todo_list_storage, report_filepaths_storage
     logger.info("Executing research plan...")
-    result = run_orchestrator(todo_list_storage)
-    return f"Orchestrator finished with result: {result}"
+    filepaths = run_orchestrator(todo_list_storage)
+    report_filepaths_storage.extend(filepaths)
+    return f"Orchestrator finished. Reports generated at: {filepaths}"
 
 @tool
 def run_synthesis_agent_tool() -> str:
     """Calls the Synthesis Agent to compile the final report."""
-    return run_synthesis_agent()
+    global report_filepaths_storage
+    return run_synthesis_agent(report_filepaths_storage)
 
 class PlannerAgent:
     def __init__(self):
@@ -83,8 +88,8 @@ class PlannerAgent:
             1. Analyze the business plan and identify key areas for research.
             2. For each research category, first explain to the user why you are adding tasks for that category, and then use the `update_todo_list` tool to add the tasks. You must follow this explain-then-call pattern for each category.
             3. After creating the plan, ask the user for confirmation to proceed.
-            4. Once the user confirms, your first action is to call the `execute_research_plan` tool to have the orchestrator contact the specialist agents.
-            5. After the `execute_research_plan` tool returns successfully, your final action is to call the `run_synthesis_agent_tool` to compile the final report.
+            4. Once the user confirms, your first action is to call the `execute_research_plan` tool to have the orchestrator contact the specialist agents. The orchestrator will return a list of file paths for the generated reports.
+            5. After the `execute_research_plan` tool returns successfully, your final action is to call the `run_synthesis_agent_tool` to compile the final report, which will use the file paths from the previous step.
             6. Explain each major step to the user before you take it (e.g., "I will now call the orchestrator...", "The orchestrator is done, now I will call the synthesis agent...").
 
             The to-do list categories you can use are:
@@ -147,7 +152,12 @@ def clear_planner_context():
 
 def get_planner_todo_list():
     """Get the current to-do list from the planner agent."""
-    return todo_list_storage.copy() 
+    return todo_list_storage.copy()
+
+def clear_report_filepaths():
+    """Clears the report filepaths storage."""
+    global report_filepaths_storage
+    report_filepaths_storage = []
 
 def clear_planner_todo_list():
     """Clear the to-do list from the planner agent."""
@@ -159,6 +169,7 @@ def clear_planner_todo_list():
         "risk_tasks": [],
         "synthesis_requirements": []
     }
+    clear_report_filepaths()
 
 def chat_with_planner(message: str) -> str:
     return planner.chat(message)

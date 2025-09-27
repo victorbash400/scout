@@ -6,6 +6,7 @@ from dotenv import load_dotenv
 
 from strands import Agent, tool
 from config.settings import settings
+from strands_tools import file_write
 
 # Load environment variables from .env file
 load_dotenv()
@@ -149,10 +150,12 @@ class CompetitionAgent:
             3.  **State the next step.** After getting the competitor list, state that you will now find images of the area to provide visual context.
             4.  **Call `get_location_images`:** Use this tool to get 2-3 images of the specified area.
             5.  **Synthesize the Final Report:** Combine the information from the tools into a single, comprehensive final answer. The report should include the number of competitors, details on the top 5, a summary of the competition level (e.g., high, medium, low), and the image URLs.
+            6.  **Save the report:** Use the `file_write` tool to save the final report to a file named `competition_report.md` in the `reports/` directory.
             """,
             tools=[
                 find_competitors,
-                get_location_images
+                get_location_images,
+                file_write
             ]
         )
         logger.info("✅ Competition Agent initialized correctly.")
@@ -164,7 +167,7 @@ class CompetitionAgent:
         prompt = (
             f"Generate a full competition report for a new '{business_type}' in '{area}'. "
             "Follow your instructions precisely to find competitors and location images, "
-            "then combine everything into a final summary."
+            "then combine everything into a final summary and save it to a file."
         )
         
         response = self.agent(prompt)
