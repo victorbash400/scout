@@ -1,26 +1,42 @@
 import os
 from typing import List
 from dotenv import load_dotenv
+from config.settings import settings
 
 load_dotenv()
 
 from strands import Agent
-from config.settings import settings
-from strands import Agent, tool
+from strands_tools.tavily import tavily_search
 
 class PriceAgent:
     def __init__(self):
+        # Load AWS credentials (optional, but needed for Bedrock)
+        if settings.aws_access_key_id:
+            os.environ['AWS_ACCESS_KEY_ID'] = settings.aws_access_key_id
+        if settings.aws_secret_access_key:
+            os.environ['AWS_SECRET_ACCESS_KEY'] = settings.aws_secret_access_key
+        if settings.aws_region:
+            os.environ['AWS_DEFAULT_REGION'] = settings.aws_region
+
         self.agent = Agent(
             name="Price Agent",
             model=settings.bedrock_model_id,
-            system_prompt="""You are the Price Agent. When you receive a list of tasks, your only job is to respond with a confirmation message stating that you have received the tasks and are ready. For example: 'The Price Agent is on standby and has received its tasks.'""",
-            tools=[]
+            system_prompt="""
+You are a meticulous Pricing Strategy Analyst. Your mission is to generate a pricing strategy report for a business in a specific location. You must use the provided tools in a logical sequence.
+
+**Your process must be:**
+1. **State your plan.** First, analyze the user's request and state that you will begin by searching for competitor prices and local market conditions.
+2. **Call `tavily_search`:** Use this tool to get competitor pricing and market data for the specified business type, products, and location.
+3. **State the next step.** After getting the search results, explain how you will use this information to recommend a pricing strategy.
+4. **Synthesize the Final Recommendation:** Combine the information from the tool into a single, comprehensive final answer. The report should include a summary of competitor prices, your recommended pricing strategy (e.g., competitive, premium, penetration), and clear reasoning. Always cite sources when possible.
+            """,
+            tools=[tavily_search]
         )
 
     def run(self, tasks: List[str]) -> str:
-        """Runs the agent to confirm receipt of tasks."""
+        """Runs the agent with the given tasks, letting the system prompt control the process."""
         task_str = ", ".join(tasks)
-        response = self.agent(f"I have been assigned the following tasks: {task_str}")
+        response = self.agent(task_str)
         return str(response.message)
 
 # Create a global instance of the agent

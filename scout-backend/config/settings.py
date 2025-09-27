@@ -9,6 +9,12 @@ from pydantic_settings import BaseSettings
 from pydantic import Field
 
 class Settings(BaseSettings):
+    # Perplexity API Key
+    perplexity_api_key: str = Field(default="", env="PERPLEXITY_API_KEY")
+    # Google Places API Key
+    google_places_api_key: str = Field(default="", env="GOOGLE_PLACES_API_KEY")
+    # Tavily API Key
+    tavily_api_key: str = Field(default="", env="TAVILY_API_KEY")
     """Application settings"""
     
     # Application

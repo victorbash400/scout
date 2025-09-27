@@ -10,6 +10,14 @@ from strands import Agent, tool
 
 class LegalAgent:
     def __init__(self):
+        # Load AWS credentials (optional, but needed for Bedrock)
+        if settings.aws_access_key_id:
+            os.environ['AWS_ACCESS_KEY_ID'] = settings.aws_access_key_id
+        if settings.aws_secret_access_key:
+            os.environ['AWS_SECRET_ACCESS_KEY'] = settings.aws_secret_access_key
+        if settings.aws_region:
+            os.environ['AWS_DEFAULT_REGION'] = settings.aws_region
+
         self.agent = Agent(
             name="Legal Agent",
             model=settings.bedrock_model_id,
