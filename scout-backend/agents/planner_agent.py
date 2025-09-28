@@ -5,8 +5,11 @@ from typing import AsyncGenerator, List, Dict
 from strands import Agent, tool
 from dotenv import load_dotenv
 from config.settings import settings
-from agents.orchestrator_agent import run_orchestrator
 from agents.synthesis_agent import run_synthesis_agent
+from agents.competition_agent import run_competition_agent
+from agents.market_agent import run_market_agent
+from agents.price_agent import run_price_agent
+from agents.legal_agent import run_legal_agent
 
 load_dotenv()
 
@@ -43,16 +46,46 @@ def update_todo_list(category: str, tasks: List[str]) -> str:
     return f"Added {len(tasks)} tasks to {category}. Total tasks in this category: {len(todo_list_storage[category])}"
 
 @tool
+def competition_agent_tool(tasks: List[str]) -> str:
+    """Delegates competition-related tasks to the Competition Agent."""
+    return run_competition_agent(tasks)
+
+@tool
+def market_agent_tool(tasks: List[str]) -> str:
+    """Delegates market-related tasks to the Market Agent."""
+    return run_market_agent(tasks)
+
+@tool
+def price_agent_tool(tasks: List[str]) -> str:
+    """Delegates price-related tasks to the Price Agent."""
+    return run_price_agent(tasks)
+
+@tool
+def legal_agent_tool(tasks: List[str]) -> str:
+    """Delegates legal-related tasks to the Legal Agent."""
+    return run_legal_agent(tasks)
+
+@tool
 def execute_research_plan() -> str:
     """
-    Executes the research plan by calling the orchestrator agent.
+    Executes the research plan by calling the specialist agents directly.
     This should be called after the user has approved the plan.
     """
     global todo_list_storage, report_filepaths_storage
     logger.info("Executing research plan...")
-    filepaths = run_orchestrator(todo_list_storage)
+    
+    filepaths = []
+    if todo_list_storage["competition_tasks"]:
+        filepaths.append(run_competition_agent(todo_list_storage["competition_tasks"]))
+    if todo_list_storage["market_tasks"]:
+        filepaths.append(run_market_agent(todo_list_storage["market_tasks"]))
+    if todo_list_storage["price_tasks"]:
+        filepaths.append(run_price_agent(todo_list_storage["price_tasks"]))
+    if todo_list_storage["legal_tasks"]:
+        filepaths.append(run_legal_agent(todo_list_storage["legal_tasks"]))
+        
     report_filepaths_storage.extend(filepaths)
-    return f"Orchestrator finished. Reports generated at: {filepaths}"
+    return f"Research finished. Reports generated at: {filepaths}"
 
 @tool
 def run_synthesis_agent_tool() -> str:
@@ -73,34 +106,42 @@ class PlannerAgent:
 
         self.agent = Agent(
             model=settings.bedrock_model_id,
-            system_prompt="""You are SCOUT, a business planning assistant. 
+            system_prompt="""You are SCOUT, a business planning assistant.
             You help users analyze business plans and create structured research to-do lists.
-            
+
             You have two modes of operation that determine your behavior:
-            
+
             CHAT MODE:
             - Engage in general conversation about business planning
             - Answer questions and provide guidance
             - Do NOT create research plans or call the update_todo_list tool
             - Focus on being helpful and informative without structured task creation
-            
+
             AGENT MODE:
             1. Analyze the business plan and identify key areas for research.
             2. For each research category, first explain to the user why you are adding tasks for that category, and then use the `update_todo_list` tool to add the tasks. You must follow this explain-then-call pattern for each category.
             3. After creating the plan, ask the user for confirmation to proceed.
-            4. Once the user confirms, your first action is to call the `execute_research_plan` tool to have the orchestrator contact the specialist agents. The orchestrator will return a list of file paths for the generated reports.
-            5. After the `execute_research_plan` tool returns successfully, your final action is to call the `run_synthesis_agent_tool` to compile the final report, which will use the file paths from the previous step.
-            6. Explain each major step to the user before you take it (e.g., "I will now call the orchestrator...", "The orchestrator is done, now I will call the synthesis agent...").
+            4. Once the user confirms, your first action is to call the appropriate specialist agent tools (`competition_agent_tool`, `market_agent_tool`, etc.) to execute the research plan.
+            5. After the specialist agents have run, your final action is to call the `run_synthesis_agent_tool` to compile the final report.
+            6. Explain each major step to the user before you take it (e.g., "I will now call the specialist agents...", "The specialist agents are done, now I will call the synthesis agent...").
 
             The to-do list categories you can use are:
             - competition_tasks: For analyzing competitors.
             - market_tasks: For understanding the market and customers.
             - price_tasks: For all pricing-related research.
             - legal_tasks: For regulatory and compliance research.
-            
-            Follow the AGENT MODE workflow strictly. Your job is to create the plan and then orchestrate the two main tool calls (`execute_research_plan`, then `run_synthesis_agent_tool`).
+
+            Follow the AGENT MODE workflow strictly. Your job is to create the plan and then execute it by calling the specialist agents and then the synthesis agent.
             """,
-            tools=[update_todo_list, execute_research_plan, run_synthesis_agent_tool]
+            tools=[
+                update_todo_list,
+                execute_research_plan,
+                run_synthesis_agent_tool,
+                competition_agent_tool,
+                market_agent_tool,
+                price_agent_tool,
+                legal_agent_tool
+            ]
         )
         self.document_context = None  # For attached file context
         print(f"✅ Planner Agent initialized with {settings.bedrock_model_id}")

@@ -2,7 +2,7 @@ import React, { useRef, useEffect } from 'react';
 import ChatBubble from './chatbubble';
 import ChatInput from './chatinput';
 import PlanComponent from '../components/PlanComponent';
-import OrchestratorComponent from '../components/OrchestratorComponent';
+
 
 interface Message {
   role: 'user' | 'assistant';
@@ -122,7 +122,7 @@ const ChatSection: React.FC<ChatSectionProps> = ({
       {isOrchestratorActive ? (
         <div className="w-96 p-4 flex items-center">
           <div className="rounded-xl border border-gray-200 bg-white w-full">
-            <OrchestratorComponent isActive={isOrchestratorActive} />
+
           </div>
         </div>
       ) : (

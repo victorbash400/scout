@@ -13,7 +13,6 @@ from agents.planner_agent import (
     get_planner_todo_list, 
     clear_planner_todo_list
 )
-from agents.orchestrator_agent import get_orchestrator_steps, clear_orchestrator_steps
 from config.settings import settings
 from storage.local import LocalStorage
 from utils.pdf_parser import extract_text_from_pdf
@@ -94,9 +93,8 @@ async def clear_context():
     try:
         clear_planner_context()
         clear_planner_todo_list()
-        clear_orchestrator_steps()
-        logger.info("Document context, to-do list, and orchestrator steps cleared.")
-        return {"message": "Context, to-do list, and orchestrator steps cleared successfully"}
+        logger.info("Document context and to-do list cleared.")
+        return {"message": "Context and to-do list cleared successfully"}
     except Exception as e:
         logger.error(f"Error clearing context: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to clear context")
@@ -111,17 +109,6 @@ async def get_todo_list():
     except Exception as e:
         logger.error(f"Error retrieving to-do list: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to retrieve to-do list")
-
-# Get orchestrator steps endpoint
-@app.get("/api/orchestrator/steps")
-async def get_steps():
-    """Get the current steps from the orchestrator agent."""
-    try:
-        steps = get_orchestrator_steps()
-        return {"steps": steps}
-    except Exception as e:
-        logger.error(f"Error retrieving orchestrator steps: {str(e)}")
-        raise HTTPException(status_code=500, detail="Failed to retrieve orchestrator steps")
 
 # Streaming chat endpoint for Planner Agent
 @app.post("/api/chat/stream")
