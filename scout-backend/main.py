@@ -16,6 +16,8 @@ from agents.planner_agent import (
 from config.settings import settings
 from storage.local import LocalStorage
 from utils.pdf_parser import extract_text_from_pdf
+from agents.competition_agent import run_competition_agent
+import asyncio
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -47,6 +49,32 @@ else:
 @app.get("/")
 async def root():
     return {"message": "SCOUT AI System is running", "status": "healthy"}
+
+@app.post("/api/test/competition/trigger")
+async def test_competition_agent(request: Dict[str, Any]):
+    """
+    Test endpoint to trigger the Competition Agent directly.
+    The agent's progress will be streamed to the /api/specialist/stream endpoint.
+    Expects JSON: {"business_type": str, "area": str}
+    """
+    business_type = request.get("business_type", "tilapia and fresh produce suppliers")
+    area = request.get("area", "Nairobi, Kenya")
+    
+    async def run_and_log_stream():
+        async for event in run_competition_agent([business_type, area]):
+            logger.info(f"[Test Trigger] Event from CompetitionAgent: {event}")
+
+    asyncio.create_task(run_and_log_stream())
+    return {"message": "Competition Agent triggered. Connect to /api/specialist/stream to see events."}
+
+@app.get("/api/test/competition/check-stream")
+async def check_specialist_stream():
+    """
+    Check if any events are currently in the event queue for specialist agents.
+    """
+    from utils.event_queue import event_queue
+    q = event_queue.get_queue()
+    return {"events_in_queue": q.qsize()}
 
 @app.get("/health")
 async def health_check():
@@ -153,6 +181,28 @@ async def chat_stream_endpoint(request: Dict[str, str]):
             "Content-Type": "text/event-stream",
         }
     )
+
+
+from utils.event_queue import event_queue, StreamEvent
+
+# Streaming endpoint for specialist agents with keepalive
+@app.get("/api/specialist/stream")
+async def specialist_stream():
+    import asyncio
+    async def event_generator():
+        while True:
+            try:
+                event: StreamEvent = await asyncio.wait_for(event_queue.get(), timeout=5)
+                logger.info(f"Event received from queue: {event}")
+                # Fix: Handle both dict and Pydantic model
+                if isinstance(event, dict):
+                    yield f"data: {json.dumps(event)}\n\n"
+                else:
+                    yield f"data: {event.json()}\n\n"
+            except asyncio.TimeoutError:
+                # Send a keepalive comment every 5 seconds
+                yield ": keepalive\n\n"
+    return StreamingResponse(event_generator(), media_type="text/event-stream")
 
 if __name__ == "__main__":
     uvicorn.run(

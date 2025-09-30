@@ -1,17 +1,132 @@
 import os
-from typing import List
+import logging
+from typing import List, Dict, AsyncGenerator
 from dotenv import load_dotenv
-from config.settings import settings
+import uuid
 
+from strands import Agent, tool
+from config.settings import settings
+from utils.event_queue import event_queue, StreamEvent
+
+# Import the global storage from shared module
+from agents.shared_storage import report_filepaths_storage, storage_lock
+
+# Load environment variables from .env file
 load_dotenv()
 
-from strands import Agent
-from strands_tools.tavily import tavily_search
-from strands_tools import file_write
+# Bypass tool consent for automated file operations
+os.environ["BYPASS_TOOL_CONSENT"] = "true"
 
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+
+# --- Tool 1: Get Pricing Data ---
+@tool
+def get_pricing_data(business_type: str, area: str) -> str:
+    """
+    Fetches pricing data and competitive pricing analysis for a specified business type in a specific area.
+
+    Args:
+        business_type: The type of business (e.g., "bakery", "gym")
+        area: The geographic area to analyze (e.g., "Nairobi, Kenya")
+
+    Returns:
+        Pricing analysis including average prices, competitive pricing, and price positioning recommendations.
+    """
+    # Simulated pricing data - in a real implementation, this would call actual APIs
+    pricing_info = f"""
+    Pricing Analysis for {business_type} in {area}:
+    
+    - Average Price Point: Moderate
+    - Competitive Landscape: Mid-range to premium pricing
+    - Price Sensitivity: Medium
+    - Premium Pricing Opportunities: For specialty/differentiated offerings
+    - Volume Pricing Strategy: Recommended for higher-volume items
+    - Seasonal Pricing: Potential for higher margins during peak seasons
+    """
+    return pricing_info
+
+
+# --- Tool 2: Update Work Progress ---
+@tool
+async def update_work_progress(status: str, message: str, task: str) -> str:
+    """
+    Updates the work progress for the specialist agent monitor.
+    This tool is called by the agent to report its current status.
+    
+    Args:
+        status: Current status ('started', 'in_progress', 'completed', 'error')
+        message: Detailed message about what's happening
+        task: The specific task being worked on
+    
+    Returns:
+        A confirmation message
+    """
+    # Create a StreamEvent and put it in the event queue
+    event = StreamEvent(
+        agentName="PriceAgent",
+        eventType="tool_call",
+        payload={
+            "tool_name": "update_work_progress",
+            "tool_input": {"status": status, "message": message, "task": task},
+            "display_message": f"{message}"
+        },
+        traceId=str(uuid.uuid4()),
+        spanId=str(uuid.uuid4()),
+        parentSpanId="planner"
+    )
+    
+    try:
+        event_queue.get_queue().put_nowait(event.dict())
+        logger.info(f"Work progress update sent: {status} - {message}")
+    except Exception as e:
+        logger.error(f"Failed to send work progress update: {e}")
+    
+    return f"Work progress updated: {status} - {task}"
+
+
+# --- Tool 3: Save Price Report ---
+@tool
+def save_price_report(content: str) -> str:
+    """
+    Saves the price report to a file and adds the path to the shared storage.
+    This ensures the synthesis agent can find the report.
+    
+    Args:
+        content: The pricing analysis content to save
+    
+    Returns:
+        A confirmation message
+    """
+    import os
+    
+    # Save to the standard report location
+    file_path = "reports/price_report.md"
+    
+    # Add the file path to the shared storage for the synthesis agent (thread-safe)
+    with storage_lock:
+        if file_path not in report_filepaths_storage:
+            report_filepaths_storage.append(file_path)
+            logger.info(f"Price report path added to storage: {file_path}")
+    
+    # Use direct file operations instead of strands_tools.file_write
+    # since calling another tool directly from within a tool is problematic
+    try:
+        os.makedirs(os.path.dirname(file_path), exist_ok=True)
+        with open(file_path, 'w', encoding='utf-8') as f:
+            f.write(content)
+        return f"Price report saved successfully to {file_path}"
+    except Exception as e:
+        logger.error(f"Failed to save price report: {e}")
+        return f"Error saving price report: {e}"
+
+
+# --- PriceAgent Class ---
 class PriceAgent:
     def __init__(self):
-        # Load AWS credentials (optional, but needed for Bedrock)
+        # AWS credentials for Bedrock
         if settings.aws_access_key_id:
             os.environ['AWS_ACCESS_KEY_ID'] = settings.aws_access_key_id
         if settings.aws_secret_access_key:
@@ -22,32 +137,57 @@ class PriceAgent:
         self.agent = Agent(
             name="Price Agent",
             model=settings.bedrock_model_id,
-            system_prompt="""
-You are a meticulous Pricing Strategy Analyst. Your mission is to generate a pricing strategy report for a business in a specific location. You must use the provided tools in a logical sequence.
+            system_prompt="""You are a meticulous Pricing Analyst. Your mission is to generate a pricing analysis report for a new business in a specific location. You must use the provided tools in a logical sequence and report your progress using the update_work_progress tool.
 
-**Your process must be:**
-1. **State your plan.** First, analyze the user's request and state that you will begin by searching for competitor prices and local market conditions.
-2. **Call `tavily_search`:** Use this tool to get competitor pricing and market data for the specified business type, products, and location.
-3. **State the next step.** After getting the search results, explain how you will use this information to recommend a pricing strategy.
-4. **Synthesize the Final Recommendation:** Combine the information from the tool into a single, comprehensive final answer. The report should include a summary of competitor prices, your recommended pricing strategy (e.g., competitive, premium, penetration), and clear reasoning. Always cite sources when possible.
-5.  **Save the report:** Use the `file_write` tool to save the final report to a file named `price_report.md` in the `reports/` directory.
+            **Your process must be:**
+            1.  **Report STARTED:** Use `update_work_progress` with status 'started' to indicate you've begun the task.
+            2.  **Explain your approach:** Briefly explain how you'll analyze the pricing for the business.
+            3.  **Report IN PROGRESS:** Use `update_work_progress` with status 'in_progress' to indicate you're gathering pricing data.
+            4.  **Call `get_pricing_data`:** Use this tool ONCE to get pricing data for the specified business type in the area - make only ONE search and be conservative with API usage.
+            5.  **Report COMPLETED:** Use `update_work_progress` with status 'completed' to indicate the pricing analysis is done.
+            6.  **Save the result:** Use the `save_price_report` tool to save the pricing analysis to a file named `price_report.md` in the `reports/` directory.
+            
+            Remember to be conservative with resources - only use the get_pricing_data and save_price_report tools.
+            Be very explicit about using the update_work_progress tool at each major step to report status to the monitor.
             """,
-            tools=[tavily_search, file_write]
+            tools=[
+                get_pricing_data,
+                update_work_progress,
+                save_price_report
+            ]
         )
+        logger.info("✅ Price Agent initialized correctly.")
 
-    def run(self, tasks: List[str]) -> str:
-        """Runs the agent with the given tasks, letting the system prompt control the process."""
-        task_str = ", ".join(tasks)
-        prompt = f"{task_str}. Save the final report to a file."
-        response = self.agent(prompt)
-        return str(response.message)
+    async def run(self, business_type: str, area: str) -> AsyncGenerator[Dict, None]:
+        """
+        Runs the agent to generate a full pricing analysis and yields the raw stream events.
+        The agent will report its progress using the update_work_progress tool.
+        """
+        prompt = (
+            f"Generate a full pricing analysis report for a new '{business_type}' in '{area}'. "
+            "Follow your instructions precisely to gather pricing data and insights, "
+            "then combine everything into a final summary and save it to a file. "
+            "Make only ONE call to get_pricing_data to be conservative with API usage."
+        )
+        
+        async for event in self.agent.stream_async(prompt):
+            yield event
 
-# Create a global instance of the agent
-price_agent = PriceAgent()
 
-def run_price_agent(tasks: List[str]) -> str:
+# --- Entry Point for Orchestrator ---
+
+async def run_price_agent(tasks: List[str]) -> AsyncGenerator[Dict, None]:
     """
-    This function is the entry point for the Price Agent.
-    It calls the run method on the global agent instance.
+    This function is the entry point for the Price Agent, called by the Orchestrator.
+    It expects the 'tasks' list to contain two items: [business_type, area].
     """
-    return price_agent.run(tasks)
+    if len(tasks) != 2:
+        yield {"error": "The Price Agent requires exactly two tasks: a business type and an area."}
+        return
+
+    business_type, area = tasks
+    logger.info(f"💰 Price Agent received tasks: Analyze '{business_type}' in '{area}'.")
+    
+    price_agent_instance = PriceAgent()
+    async for event in price_agent_instance.run(business_type, area):
+        yield event

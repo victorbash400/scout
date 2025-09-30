@@ -44,7 +44,7 @@ function App() {
   const [mode, setMode] = useState<'chat' | 'agent'>('chat');
   const [todoList, setTodoList] = useState<TodoList | null>(null);
   const [activeToolCalls, setActiveToolCalls] = useState<Set<string>>(new Set());
-  const [isOrchestratorActive, setIsOrchestratorActive] = useState(false);
+  const [isExecutingPlan, setIsExecutingPlan] = useState(false);
 
   // New state for file handling
   const [attachedFile, setAttachedFile] = useState<File | null>(null);
@@ -254,7 +254,7 @@ function App() {
               } else if (parsed.tool_start) {
                 const { tool_name, tool_use_id, content_block_index } = parsed.tool_start;
                 if (tool_name === 'execute_research_plan') {
-                  setIsOrchestratorActive(true);
+                  setIsExecutingPlan(true);
                 }
                 const toolMessage: Message = {
                   role: 'assistant',
@@ -273,7 +273,7 @@ function App() {
                 
                 const startMessage = messages.find(msg => msg.tool_use_id === tool_use_id);
                 if (startMessage && startMessage.tool_name === 'execute_research_plan') {
-                  setIsOrchestratorActive(false);
+                  setIsExecutingPlan(false);
                 }
 
                 setMessages((prev) =>
@@ -360,7 +360,7 @@ function App() {
         mode={mode}
         todoList={todoList}
         activeToolCalls={activeToolCalls}
-        isOrchestratorActive={isOrchestratorActive}
+        isExecutingPlan={isExecutingPlan}
       />
     </div>
   )

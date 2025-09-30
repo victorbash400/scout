@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ChevronDown, ChevronRight, CheckCircle2, Circle, Target } from 'lucide-react';
+import { ChevronDown, ChevronRight, CheckCircle2,  } from 'lucide-react';
 
 interface TodoList {
   competition_tasks: string[];
@@ -90,9 +90,7 @@ const PlanComponent: React.FC<PlanComponentProps> = ({ todoList }) => {
         )}
       </div>
       
-      <div className="p-3 border-t border-gray-200 text-xs text-gray-400">
-        This plan will be passed to the Orchestrator Agent when complete.
-      </div>
+      {/* Removed note about passing plan to Orchestrator Agent */}
     </div>
   );
 };

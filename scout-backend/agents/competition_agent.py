@@ -1,15 +1,25 @@
 import os
 import requests
 import logging
-from typing import List, Dict
+from typing import List, Dict, AsyncGenerator
 from dotenv import load_dotenv
+import uuid
+import asyncio
 
 from strands import Agent, tool
 from config.settings import settings
-from strands_tools import file_write
+from strands import Agent, tool
+from config.settings import settings
+from utils.event_queue import event_queue, StreamEvent
+
+# Import the global storage from shared module
+from agents.shared_storage import report_filepaths_storage, storage_lock
 
 # Load environment variables from .env file
 load_dotenv()
+
+# Bypass tool consent for automated file operations
+os.environ["BYPASS_TOOL_CONSENT"] = "true"
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -17,7 +27,7 @@ logger = logging.getLogger(__name__)
 
 # --- Tool 1: Find Competing Businesses ---
 @tool
-def find_competitors(business_type: str, area: str) -> str:
+async def find_competitors(business_type: str, area: str) -> str:
     """
     Finds competing businesses in a specified area using the Google Places API v1.
     It returns a summary of the top 5 competitors found.
@@ -42,8 +52,11 @@ def find_competitors(business_type: str, area: str) -> str:
     data = {"textQuery": f"{business_type} in {area}"}
 
     try:
-        response = requests.post(url, headers=headers, json=data)
-        response.raise_for_status()  # Raise an exception for bad status codes
+        # Use aiohttp for async HTTP requests, but since we're using requests,
+        # we'll run it in a thread pool to make it non-blocking
+        loop = asyncio.get_event_loop()
+        response = await loop.run_in_executor(None, lambda: requests.post(url, headers=headers, json=data))
+        response.raise_for_status()
         places_data = response.json()
 
         competitors = places_data.get("places", [])
@@ -62,67 +75,78 @@ def find_competitors(business_type: str, area: str) -> str:
         logger.error(f"API request failed in find_competitors: {e}")
         return f"Error: Failed to communicate with the Google Places API. {e}"
 
-# --- Tool 2: Get Location Images ---
+# --- Tool 3: Update Work Progress ---
 @tool
-def get_location_images(area: str, count: int = 2) -> str:
+async def update_work_progress(status: str, message: str, task: str) -> str:
     """
-    Finds notable landmarks or places in an area and returns direct URLs to their photos.
-    This uses a two-step process: first find places with photos, then get their image URIs.
-
+    Updates the work progress for the specialist agent monitor.
+    This tool is called by the agent to report its current status.
+    
     Args:
-        area: The geographic location to find images for (e.g., "downtown Juja").
-        count: The number of image URLs to return. Defaults to 2.
-
+        status: Current status ('started', 'in_progress', 'completed', 'error')
+        message: Detailed message about what's happening
+        task: The specific task being worked on
+    
     Returns:
-        A string listing the direct URLs of the found images.
+        A confirmation message
     """
-    api_key = os.getenv("GOOGLE_PLACES_API_KEY")
-    if not api_key:
-        return "Error: GOOGLE_PLACES_API_KEY is not configured."
-
-    # Step 1: Search for places with photos
-    search_url = "https://places.googleapis.com/v1/places:searchText"
-    search_headers = {
-        "Content-Type": "application/json",
-        "X-Goog-Api-Key": api_key,
-        "X-Goog-FieldMask": "places.photos"
-    }
-    search_data = {"textQuery": f"notable landmark in {area}"}
-
+    # Create a StreamEvent and put it in the event queue
+    event = StreamEvent(
+        agentName="CompetitionAgent",
+        eventType="tool_call",
+        payload={
+            "tool_name": "update_work_progress",
+            "tool_input": {"status": status, "message": message, "task": task},
+            "display_message": f"{message}"
+        },
+        traceId=str(uuid.uuid4()),
+        spanId=str(uuid.uuid4()),
+        parentSpanId="planner"
+    )
+    
     try:
-        search_response = requests.post(search_url, headers=search_headers, json=search_data)
-        search_response.raise_for_status()
-        places_data = search_response.json()
-        
-        photo_names = []
-        places = places_data.get("places", [])
-        for place in places:
-            if "photos" in place and place["photos"]:
-                photo_names.append(place["photos"][0]["name"])
-            if len(photo_names) >= count:
-                break
-        
-        if not photo_names:
-            return f"Could not find any images for landmarks in '{area}'."
+        event_queue.get_queue().put_nowait(event.dict())
+        logger.info(f"Work progress update sent: {status} - {message}")
+    except Exception as e:
+        logger.error(f"Failed to send work progress update: {e}")
+    
+    return f"Work progress updated: {status} - {task}"
 
-        # Step 2: Get the photoUri for each photo name
-        image_urls = []
-        for photo_name in photo_names:
-            photo_url = f"https://places.googleapis.com/v1/{photo_name}/media?key={api_key}&maxHeightPx=800&maxWidthPx=800&skipHttpRedirect=true"
-            photo_resp = requests.get(photo_url)
-            if photo_resp.status_code == 200:
-                photo_json = photo_resp.json()
-                if "photoUri" in photo_json:
-                    image_urls.append(photo_json["photoUri"])
 
-        if not image_urls:
-            return "Found places with photos, but could not retrieve the final image URLs."
-
-        return f"Found {len(image_urls)} images for '{area}':\n" + "\n".join(image_urls)
-
-    except requests.exceptions.RequestException as e:
-        logger.error(f"API request failed in get_location_images: {e}")
-        return f"Error: Failed to communicate with the Google Places API. {e}"
+# --- Tool 4: Save Competition Report ---
+@tool
+def save_competition_report(content: str) -> str:
+    """
+    Saves the competition report to a file and adds the path to the shared storage.
+    This ensures the synthesis agent can find the report.
+    
+    Args:
+        content: The competition analysis content to save
+    
+    Returns:
+        A confirmation message
+    """
+    import os
+    
+    # Save to the standard report location
+    file_path = "reports/competition_report.md"
+    
+    # Add the file path to the shared storage for the synthesis agent (thread-safe)
+    with storage_lock:
+        if file_path not in report_filepaths_storage:
+            report_filepaths_storage.append(file_path)
+            logger.info(f"Competition report path added to storage: {file_path}")
+    
+    # Use direct file operations instead of strands_tools.file_write
+    # since calling another tool directly from within a tool is problematic
+    try:
+        os.makedirs(os.path.dirname(file_path), exist_ok=True)
+        with open(file_path, 'w', encoding='utf-8') as f:
+            f.write(content)
+        return f"Competition report saved successfully to {file_path}"
+    except Exception as e:
+        logger.error(f"Failed to save competition report: {e}")
+        return f"Error saving competition report: {e}"
 
 
 # --- CompetitionAgent Class ---
@@ -132,72 +156,85 @@ class CompetitionAgent:
             raise ValueError("GOOGLE_PLACES_API_KEY environment variable not set.")
 
         # AWS credentials for Bedrock
-        # Load AWS credentials (optional, but needed for Bedrock)
         if settings.aws_access_key_id:
             os.environ['AWS_ACCESS_KEY_ID'] = settings.aws_access_key_id
         if settings.aws_secret_access_key:
             os.environ['AWS_SECRET_ACCESS_KEY'] = settings.aws_secret_access_key
         if settings.aws_region:
             os.environ['AWS_DEFAULT_REGION'] = settings.aws_region
+
         self.agent = Agent(
             name="Competition Agent",
             model=settings.bedrock_model_id,
-            system_prompt="""You are a meticulous Competition Analyst. Your mission is to generate a competition report for a new business in a specific location. You must use the provided tools in a logical sequence.
+            system_prompt="""You are a meticulous Competition Analyst. Your mission is to generate a competition report for a new business in a specific location. You must use the provided tools in a logical sequence and report your progress using the update_work_progress tool.
 
             **Your process must be:**
-            1.  **State your plan.** First, analyze the user's request and state that you will begin by searching for competitors.
-            2.  **Call `find_competitors`:** Use this tool to get a list of competing businesses.
-            3.  **State the next step.** After getting the competitor list, state that you will now find images of the area to provide visual context.
-            4.  **Call `get_location_images`:** Use this tool to get 2-3 images of the specified area.
-            5.  **Synthesize the Final Report:** Combine the information from the tools into a single, comprehensive final answer. The report should include the number of competitors, details on the top 5, a summary of the competition level (e.g., high, medium, low), and the image URLs.
-            6.  **Save the report:** Use the `file_write` tool to save the final report to a file named `competition_report.md` in the `reports/` directory.
+            1.  **Report STARTED:** Use `update_work_progress` with status 'started' to indicate you've begun the task.
+            2.  **Explain your approach:** Briefly explain how you'll analyze the market for competitors.
+            3.  **Report IN PROGRESS:** Use `update_work_progress` with status 'in_progress' to indicate you're searching for competitors.
+            4.  **Call `find_competitors`:** Use this tool ONCE to get a list of competing businesses - make only ONE search and be conservative with API usage.
+            5.  **Report COMPLETED:** Use `update_work_progress` with status 'completed' to indicate the competitor analysis is done.
+            6.  **Save the result:** Use the `save_competition_report` tool to save the competition analysis to a file named `competition_report.md` in the `reports/` directory.
+            
+            Remember to be conservative with resources - only use the find_competitors and save_competition_report tools.
+            Be very explicit about using the update_work_progress tool at each major step to report status to the monitor.
             """,
             tools=[
                 find_competitors,
-                get_location_images,
-                file_write
+                update_work_progress,
+                save_competition_report
             ]
         )
         logger.info("✅ Competition Agent initialized correctly.")
 
-    def run(self, business_type: str, area: str) -> str:
+    async def run(self, business_type: str, area: str) -> AsyncGenerator[Dict, None]:
         """
-        Runs the agent to generate a full competition analysis.
+        Runs the agent to generate a full competition analysis and yields the raw stream events.
+        The agent will report its progress using the update_work_progress tool.
         """
         prompt = (
             f"Generate a full competition report for a new '{business_type}' in '{area}'. "
-            "Follow your instructions precisely to find competitors and location images, "
-            "then combine everything into a final summary and save it to a file."
+            "Follow your instructions precisely to find competitors, "
+            "then combine everything into a final summary and save it to a file. "
+            "Make only ONE call to find_competitors to be conservative with API usage."
         )
         
-        response = self.agent(prompt)
-        return str(response.message)
+        async for event in self.agent.stream_async(prompt):
+            yield event
 
 # --- Entry Point for Orchestrator ---
 
-# Create a single, global instance of the agent
-competition_agent_instance = CompetitionAgent()
-
-def run_competition_agent(tasks: List[str]) -> str:
+async def run_competition_agent(tasks: List[str]) -> AsyncGenerator[Dict, None]:
     """
     This function is the entry point for the Competition Agent, called by the Orchestrator.
     It expects the 'tasks' list to contain two items: [business_type, area].
     """
     if len(tasks) != 2:
-        return "Error: The Competition Agent requires exactly two tasks: a business type and an area."
-    
+        yield {"error": "The Competition Agent requires exactly two tasks: a business type and an area."}
+        return
+
     business_type, area = tasks
     logger.info(f"🕵️‍♂️ Competition Agent received tasks: Analyze '{business_type}' in '{area}'.")
     
-    return competition_agent_instance.run(business_type, area)
+    competition_agent_instance = CompetitionAgent()
+    async for event in competition_agent_instance.run(business_type, area):
+        # Here, we could add logic to capture the final report if needed
+        yield event
 
 # --- Example Usage (for direct testing) ---
-if __name__ == "__main__":
-    # This block allows you to test the agent directly without the orchestrator
+async def main():
     test_tasks = ["specialty coffee shop", "Juja, Kiambu County"]
     
-    analysis_result = run_competition_agent(test_tasks)
+    print("\n--- AGENT'S STREAMED EVENTS ---")
+    final_report = ""
+    async for event in run_competition_agent(test_tasks):
+        print(event)
+        if event.get('event') == 'contentBlockDelta' and 'text' in event.get('delta', {}):
+            final_report += event['delta']['text']
     
     print("\n--- AGENT'S FINAL REPORT ---")
-    print(analysis_result)
+    print(final_report)
     print("----------------------------\n")
+
+if __name__ == "__main__":
+    asyncio.run(main())

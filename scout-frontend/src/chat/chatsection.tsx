@@ -2,6 +2,7 @@ import React, { useRef, useEffect } from 'react';
 import ChatBubble from './chatbubble';
 import ChatInput from './chatinput';
 import PlanComponent from '../components/PlanComponent';
+import UpdateComponent from '../components/UpdateComponent';
 
 
 interface Message {
@@ -38,7 +39,7 @@ interface ChatSectionProps {
   mode?: 'chat' | 'agent';
   todoList?: TodoList | null;
   activeToolCalls?: Set<string>;
-  isOrchestratorActive?: boolean;
+  isExecutingPlan?: boolean;
 }
 
 const ChatSection: React.FC<ChatSectionProps> = ({
@@ -52,7 +53,7 @@ const ChatSection: React.FC<ChatSectionProps> = ({
   mode = 'chat',
   todoList = null,
   activeToolCalls = new Set(),
-  isOrchestratorActive = false,
+  isExecutingPlan = false,
 }) => {
   const chatContainerRef = useRef<HTMLDivElement>(null);
 
@@ -118,15 +119,15 @@ const ChatSection: React.FC<ChatSectionProps> = ({
         </div>
       </div>
       
-      {/* Show Orchestrator component when orchestrator is active, otherwise show Plan component */}
-      {isOrchestratorActive ? (
+      {/* Show SpecialistAgentMonitor when plan is executing, otherwise show Plan component */}
+      {isExecutingPlan ? (
         <div className="w-96 p-4 flex items-center">
           <div className="rounded-xl border border-gray-200 bg-white w-full">
-
+            <UpdateComponent />
           </div>
         </div>
       ) : (
-        /* Plan component for agent mode when orchestrator is not active */
+        // Plan component for agent mode when plan is not executing
         mode === 'agent' && (activeToolCalls.size > 0 || (todoList && Object.values(todoList).some(category => category.length > 0))) && (
           <div className="w-96 p-4 flex items-center">
             <div className="rounded-xl border border-gray-200 bg-white w-full">

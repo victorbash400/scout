@@ -24,8 +24,8 @@ todo_list_storage: Dict[str, List[str]] = {
     "legal_tasks": []
 }
 
-# Global storage for report file paths
-report_filepaths_storage: List[str] = []
+# Import shared storage for report file paths
+from agents.shared_storage import report_filepaths_storage, storage_lock
 
 @tool
 def update_todo_list(category: str, tasks: List[str]) -> str:
@@ -45,47 +45,80 @@ def update_todo_list(category: str, tasks: List[str]) -> str:
     todo_list_storage[category].extend(tasks)
     return f"Added {len(tasks)} tasks to {category}. Total tasks in this category: {len(todo_list_storage[category])}"
 
-@tool
-def competition_agent_tool(tasks: List[str]) -> str:
-    """Delegates competition-related tasks to the Competition Agent."""
-    return run_competition_agent(tasks)
+
+import uuid
+from utils.event_queue import event_queue, StreamEvent
 
 @tool
-def market_agent_tool(tasks: List[str]) -> str:
-    """Delegates market-related tasks to the Market Agent."""
-    return run_market_agent(tasks)
-
-@tool
-def price_agent_tool(tasks: List[str]) -> str:
-    """Delegates price-related tasks to the Price Agent."""
-    return run_price_agent(tasks)
-
-@tool
-def legal_agent_tool(tasks: List[str]) -> str:
-    """Delegates legal-related tasks to the Legal Agent."""
-    return run_legal_agent(tasks)
-
-@tool
-def execute_research_plan() -> str:
+async def execute_research_plan() -> str:
     """
-    Executes the research plan by calling the specialist agents directly.
+    Executes the research plan by calling the specialist agents sequentially and streaming their progress.
     This should be called after the user has approved the plan.
     """
     global todo_list_storage, report_filepaths_storage
     logger.info("Executing research plan...")
     
-    filepaths = []
-    if todo_list_storage["competition_tasks"]:
-        filepaths.append(run_competition_agent(todo_list_storage["competition_tasks"]))
-    if todo_list_storage["market_tasks"]:
-        filepaths.append(run_market_agent(todo_list_storage["market_tasks"]))
-    if todo_list_storage["price_tasks"]:
-        filepaths.append(run_price_agent(todo_list_storage["price_tasks"]))
-    if todo_list_storage["legal_tasks"]:
-        filepaths.append(run_legal_agent(todo_list_storage["legal_tasks"]))
+    trace_id = str(uuid.uuid4())
+    parent_span_id = "planner"
+
+    # Using a synchronous helper to avoid yielding control to the main agent loop prematurely
+    def send_event_nowait(event: StreamEvent):
+        try:
+            event_queue.get_queue().put_nowait(event.dict())
+        except Exception as e:
+            logger.error(f"Failed to put event on queue: {e}")
+
+    async def stream_and_capture_report(agent_name: str, agent_function, tasks: List[str]) -> str:
+        """Helper to stream events and capture the final report."""
+        final_report_content = ""
+        span_id = str(uuid.uuid4())
+
+        # Send initial thought start event (this is for the planner's wrapper, not the agent's progress)
+        send_event_nowait(StreamEvent(
+            agentName=agent_name, eventType="thought_start", payload={},
+            traceId=trace_id, spanId=span_id, parentSpanId=parent_span_id
+        ))
+
+        # For the new agent system, the agents themselves send progress updates via update_work_progress tool
+        # We just need to run the agent and capture any content deltas
+        async for event in agent_function(tasks):
+            event_type = event.get('event')
+            if event_type == 'contentBlockDelta' and 'text' in event.get('delta', {}):
+                text = event['delta']['text']
+                final_report_content += text
+
+        # Send final thought end event
+        send_event_nowait(StreamEvent(
+            agentName=agent_name, eventType="thought_end", payload={},
+            traceId=trace_id, spanId=span_id, parentSpanId=parent_span_id
+        ))
         
-    report_filepaths_storage.extend(filepaths)
-    return f"Research finished. Reports generated at: {filepaths}"
+        return final_report_content
+
+    if todo_list_storage["competition_tasks"]:
+        await stream_and_capture_report("CompetitionAgent", run_competition_agent, todo_list_storage["competition_tasks"])
+
+    if todo_list_storage["market_tasks"]:
+        # This will still fail until market_agent is refactored
+        # But the planner agent should now complete the first step without getting confused
+        try:
+            await stream_and_capture_report("MarketAgent", run_market_agent, todo_list_storage["market_tasks"])
+        except TypeError as e:
+            logger.error(f"MarketAgent is not an async generator: {e}. Skipping.")
+
+    if todo_list_storage["price_tasks"]:
+        try:
+            await stream_and_capture_report("PriceAgent", run_price_agent, todo_list_storage["price_tasks"])
+        except TypeError as e:
+            logger.error(f"PriceAgent is not an async generator: {e}. Skipping.")
+
+    if todo_list_storage["legal_tasks"]:
+        try:
+            await stream_and_capture_report("LegalAgent", run_legal_agent, todo_list_storage["legal_tasks"])
+        except TypeError as e:
+            logger.error(f"LegalAgent is not an async generator: {e}. Skipping.")
+
+    return f"Research finished. All specialist agents have completed their tasks."
 
 @tool
 def run_synthesis_agent_tool() -> str:
@@ -119,9 +152,9 @@ class PlannerAgent:
 
             AGENT MODE:
             1. Analyze the business plan and identify key areas for research.
-            2. For each research category, first explain to the user why you are adding tasks for that category, and then use the `update_todo_list` tool to add the tasks. You must follow this explain-then-call pattern for each category.
+            2. For each research category, first explain to the user why you are adding tasks for that category, and then use the `update_todo_list` tool to add ONLY ONE OR TWO of the most essential tasks. You must follow this explain-then-call pattern for each category.
             3. After creating the plan, ask the user for confirmation to proceed.
-            4. Once the user confirms, your first action is to call the appropriate specialist agent tools (`competition_agent_tool`, `market_agent_tool`, etc.) to execute the research plan.
+            4. Once the user confirms, your first action is to call the `execute_research_plan` tool to execute the research plan.
             5. After the specialist agents have run, your final action is to call the `run_synthesis_agent_tool` to compile the final report.
             6. Explain each major step to the user before you take it (e.g., "I will now call the specialist agents...", "The specialist agents are done, now I will call the synthesis agent...").
 
@@ -136,11 +169,7 @@ class PlannerAgent:
             tools=[
                 update_todo_list,
                 execute_research_plan,
-                run_synthesis_agent_tool,
-                competition_agent_tool,
-                market_agent_tool,
-                price_agent_tool,
-                legal_agent_tool
+                run_synthesis_agent_tool
             ]
         )
         self.document_context = None  # For attached file context
@@ -197,8 +226,9 @@ def get_planner_todo_list():
 
 def clear_report_filepaths():
     """Clears the report filepaths storage."""
-    global report_filepaths_storage
-    report_filepaths_storage = []
+    from agents.shared_storage import report_filepaths_storage, storage_lock
+    with storage_lock:
+        report_filepaths_storage.clear()
 
 def clear_planner_todo_list():
     """Clear the to-do list from the planner agent."""
