@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
+import ReportLink from './ReportLink';
 
 interface StreamEvent {
     eventId: string;
@@ -11,7 +12,17 @@ interface StreamEvent {
     parentSpanId?: string;
 }
 
-const UpdateComponent: React.FC = () => {
+interface Report {
+  name: string;
+  path: string;
+}
+
+interface UpdateComponentProps {
+  onNewEvent?: (event: StreamEvent) => void;
+  generatedReports?: Report[];
+}
+
+const UpdateComponent: React.FC<UpdateComponentProps> = ({ onNewEvent, generatedReports = [] }) => {
     const [events, setEvents] = useState<StreamEvent[]>([]);
     const eventsEndRef = useRef<HTMLDivElement>(null);
 
@@ -19,8 +30,12 @@ const UpdateComponent: React.FC = () => {
         const eventSource = new EventSource('http://localhost:8000/api/specialist/stream');
 
         eventSource.onmessage = (event) => {
+            if (event.data.startsWith(':')) return; // Ignore keepalive pings
             const newEvent: StreamEvent = JSON.parse(event.data);
             setEvents(prevEvents => [...prevEvents, newEvent]);
+            if (onNewEvent) {
+              onNewEvent(newEvent);
+            }
         };
 
         eventSource.onerror = (error) => {
@@ -136,7 +151,22 @@ const UpdateComponent: React.FC = () => {
                     <div className="flex items-center justify-center h-full text-xs text-gray-400">Waiting for agent activity...</div>
                 )}
             </div>
-            {/* Removed bottom progress updates sentence and div */}
+            
+                        {/* Show generated reports at the bottom of the Update Component */}
+                        {generatedReports.length > 0 && (
+                                                <div className="p-3 border-t border-gray-200 flex items-center gap-2 min-h-[40px]">
+                                                    <span className="text-xs text-gray-600 mr-2">Reports:</span>
+                                                    <div className="flex gap-2 overflow-x-auto scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100">
+                                                        {generatedReports.map(report => (
+                                                            <ReportLink
+                                                                key={report.path}
+                                                                report={report}
+                                                                className=""
+                                                            />
+                                                        ))}
+                                                    </div>
+                                                </div>
+                        )}
         </div>
     );
 };

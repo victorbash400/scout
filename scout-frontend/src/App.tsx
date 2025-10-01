@@ -51,6 +51,79 @@ function App() {
   const [isProcessingFile, setIsProcessingFile] = useState(false);
   const [fileContext, setFileContext] = useState<string | null>(null);
 
+  // State for generated reports
+  const [generatedReports, setGeneratedReports] = useState<{name: string, path: string}[]>([]);
+  const [pendingSaveToolCalls, setPendingSaveToolCalls] = useState<Record<string, string>>({});
+
+  // Fetch current reports from backend (less frequent polling to reduce logs)
+  useEffect(() => {
+    const fetchCurrentReports = async () => {
+      try {
+        const response = await fetch('http://localhost:8000/api/reports/list');
+        if (response.ok) {
+          const data = await response.json();
+          setGeneratedReports(data.reports);
+        }
+      } catch (error) {
+        console.error('Error fetching reports list:', error);
+      }
+    };
+
+    fetchCurrentReports();
+    
+    // Set up interval to periodically fetch updated reports (every 10 seconds instead of 3)
+    const intervalId = setInterval(fetchCurrentReports, 10000);
+    
+    return () => clearInterval(intervalId);
+  }, []);
+
+  const handleSpecialistEvent = (event: any) => {
+    if (event.eventType === 'tool_call') {
+      const toolName = event.payload.tool_name;
+      const toolUseId = event.payload.tool_use_id;
+      if (toolName && toolUseId && toolName.startsWith('save_') && toolName.endsWith('_report')) {
+        setPendingSaveToolCalls(prev => ({ ...prev, [toolUseId]: toolName }));
+      }
+    } else if (event.eventType === 'tool_output') {
+      const toolUseId = event.payload.tool_use_id;
+      if (toolUseId && pendingSaveToolCalls[toolUseId]) {
+        const toolName = pendingSaveToolCalls[toolUseId];
+        const reportName = toolName.replace('save_', '').replace('_report', '');
+        const formattedName = reportName.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ') + ' Report';
+        // Extract file path from the tool output
+        const output = event.payload.output;
+        let filePath = null;
+
+        // Try to extract file path from the output
+        if (typeof output === 'string') {
+          // Look for patterns like "reports/..." in the output
+          const reportPathMatch = output.match(/reports\/[^\s'"]+/);
+          if (reportPathMatch) {
+            filePath = reportPathMatch[0];
+          } else if (output.startsWith('reports/')) {
+            filePath = output.split('\n')[0].trim(); // Take first line if it starts with reports/
+          }
+        }
+
+        if (filePath) {
+            setGeneratedReports(prevReports => {
+              if (!prevReports.some(report => report.path === filePath)) {
+                return [...prevReports, { name: formattedName, path: filePath }];
+              }
+              return prevReports;
+            });
+        }
+
+        // Clean up the pending call
+        setPendingSaveToolCalls(prev => {
+          const newPending = { ...prev };
+          delete newPending[toolUseId];
+          return newPending;
+        });
+      }
+    }
+  };
+
   // Initialize first chat session
   useEffect(() => {
     const initialChatId = generateChatId();
@@ -361,6 +434,8 @@ function App() {
         todoList={todoList}
         activeToolCalls={activeToolCalls}
         isExecutingPlan={isExecutingPlan}
+        generatedReports={generatedReports}
+        onNewEvent={handleSpecialistEvent}
       />
     </div>
   )

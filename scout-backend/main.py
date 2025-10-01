@@ -19,6 +19,13 @@ from utils.pdf_parser import extract_text_from_pdf
 from agents.competition_agent import run_competition_agent
 import asyncio
 
+from fastapi.responses import StreamingResponse, FileResponse
+from fpdf import FPDF
+import markdown
+import io
+import os
+from agents.shared_storage import report_filepaths_storage, storage_lock
+
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -185,6 +192,46 @@ async def chat_stream_endpoint(request: Dict[str, str]):
 
 from utils.event_queue import event_queue, StreamEvent
 
+@app.get("/api/reports/list")
+async def get_current_reports():
+    """Returns the current list of generated reports from shared storage."""
+    with storage_lock:
+        reports = []
+        for path in report_filepaths_storage:
+            # Extract the report name from the path
+            filename = os.path.basename(path)
+            if filename.endswith('.md'):
+                report_name = filename.replace('.md', '').replace('_', ' ').title()
+                if 'report' not in report_name.lower():
+                    report_name += ' Report'
+            else:
+                report_name = filename
+            reports.append({
+                "name": report_name,
+                "path": path
+            })
+        return {"reports": reports}
+
+@app.get("/api/reports/list")
+async def get_current_reports():
+    """Returns the current list of generated reports from shared storage."""
+    with storage_lock:
+        reports = []
+        for path in report_filepaths_storage:
+            # Extract the report name from the path
+            filename = os.path.basename(path)
+            if filename.endswith('.md'):
+                report_name = filename.replace('.md', '').replace('_', ' ').title()
+                if 'report' not in report_name.lower():
+                    report_name += ' Report'
+            else:
+                report_name = filename
+            reports.append({
+                "name": report_name,
+                "path": path
+            })
+        return {"reports": reports}
+
 # Streaming endpoint for specialist agents with keepalive
 @app.get("/api/specialist/stream")
 async def specialist_stream():
@@ -203,6 +250,62 @@ async def specialist_stream():
                 # Send a keepalive comment every 5 seconds
                 yield ": keepalive\n\n"
     return StreamingResponse(event_generator(), media_type="text/event-stream")
+
+@app.get("/api/reports/{report_name}")
+async def get_report_as_pdf(report_name: str):
+    """Converts a markdown report to PDF and streams it.
+    Expects a report name like 'competition_report.md'"""
+    # Basic security check to prevent path traversal
+    if ".." in report_name or not report_name.endswith(".md"):
+        raise HTTPException(status_code=400, detail="Invalid report name")
+
+    file_path = os.path.join("reports", report_name)
+
+    if not os.path.exists(file_path):
+        raise HTTPException(status_code=404, detail="Report not found")
+
+    try:
+        with open(file_path, 'r', encoding='utf-8') as f:
+            markdown_content = f.read()
+
+        # Convert markdown to plain text
+        from markdown import markdown as md_to_html
+        from fpdf import FPDF
+        import re
+
+        # Remove HTML tags for a simple text PDF
+        html_content = md_to_html(markdown_content)
+        text_content = re.sub('<[^<]+?>', '', html_content)
+
+        pdf = FPDF()
+        pdf.add_page()
+        pdf.set_auto_page_break(auto=True, margin=15)
+        pdf.set_font("Arial", size=12)
+
+        # Split text into lines and add to PDF
+        for line in text_content.splitlines():
+            pdf.cell(0, 10, line, ln=True)
+
+        temp_pdf_path = "temp_report.pdf"
+        pdf.output(temp_pdf_path)
+
+        with open(temp_pdf_path, 'rb') as f:
+            pdf_bytes = f.read()
+
+        pdf_stream = io.BytesIO(pdf_bytes)
+
+        if os.path.exists(temp_pdf_path):
+            os.remove(temp_pdf_path)
+
+        return StreamingResponse(
+            pdf_stream,
+            media_type="application/pdf",
+            headers={"Content-Disposition": f"attachment; filename={report_name.replace('.md', '.pdf')}"}
+        )
+
+    except Exception as e:
+        logger.error(f"Failed to convert report to PDF: {e}")
+        raise HTTPException(status_code=500, detail="Failed to convert report to PDF")
 
 if __name__ == "__main__":
     uvicorn.run(

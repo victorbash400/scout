@@ -40,6 +40,8 @@ interface ChatSectionProps {
   todoList?: TodoList | null;
   activeToolCalls?: Set<string>;
   isExecutingPlan?: boolean;
+  generatedReports?: { name: string; path: string }[];
+  onNewEvent?: (event: any) => void;
 }
 
 const ChatSection: React.FC<ChatSectionProps> = ({
@@ -54,6 +56,8 @@ const ChatSection: React.FC<ChatSectionProps> = ({
   todoList = null,
   activeToolCalls = new Set(),
   isExecutingPlan = false,
+  generatedReports = [],
+  onNewEvent = () => {},
 }) => {
   const chatContainerRef = useRef<HTMLDivElement>(null);
 
@@ -69,8 +73,8 @@ const ChatSection: React.FC<ChatSectionProps> = ({
       {/* Main chat area */}
       <div className="flex-1 flex flex-col">
         {/* Chat messages area */}
-        <div ref={chatContainerRef} className="flex-1 overflow-y-auto pt-16 pb-24 scrollbar-hide">
-          <div className="max-w-2xl mx-auto px-8 py-6">
+        <div ref={chatContainerRef} className="flex-1 overflow-y-auto pt-16 scrollbar-hide">
+          <div className="max-w-2xl mx-auto px-8">
             <div className="space-y-8">
               {messages.map((message, index) => (
                 <ChatBubble
@@ -102,10 +106,9 @@ const ChatSection: React.FC<ChatSectionProps> = ({
           </div>
         </div>
         
-        {/* Floating bottom chat input */}
-        <div className="absolute bottom-0 left-0 right-0 p-6 pb-2">
-          <div className="max-w-2xl mx-auto relative">
-            <div className="absolute inset-0 bg-gradient-to-t from-white via-white to-transparent -z-10"></div>
+        {/* Bottom chat input */}
+        <div>
+          <div className="max-w-2xl mx-auto">
             <ChatInput 
               onSendMessage={onSendMessage} 
               disabled={isLoading} 
@@ -123,7 +126,7 @@ const ChatSection: React.FC<ChatSectionProps> = ({
       {isExecutingPlan ? (
         <div className="w-96 p-4 flex items-center">
           <div className="rounded-xl border border-gray-200 bg-white w-full">
-            <UpdateComponent />
+            <UpdateComponent onNewEvent={onNewEvent} generatedReports={generatedReports} />
           </div>
         </div>
       ) : (
@@ -131,7 +134,7 @@ const ChatSection: React.FC<ChatSectionProps> = ({
         mode === 'agent' && (activeToolCalls.size > 0 || (todoList && Object.values(todoList).some(category => category.length > 0))) && (
           <div className="w-96 p-4 flex items-center">
             <div className="rounded-xl border border-gray-200 bg-white w-full">
-              <PlanComponent todoList={todoList} />
+              <PlanComponent todoList={todoList} generatedReports={generatedReports} />
             </div>
           </div>
         )

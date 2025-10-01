@@ -121,10 +121,15 @@ async def execute_research_plan() -> str:
     return f"Research finished. All specialist agents have completed their tasks."
 
 @tool
-def run_synthesis_agent_tool() -> str:
+async def run_synthesis_agent_tool() -> str:
     """Calls the Synthesis Agent to compile the final report."""
     global report_filepaths_storage
-    return run_synthesis_agent(report_filepaths_storage)
+    # Run the synthesis agent and consume its async generator
+    async for event in run_synthesis_agent(report_filepaths_storage):
+        # The synthesis agent sends its own progress updates via update_work_progress tool
+        # We just need to consume the events without doing anything special
+        pass
+    return "Synthesis agent has completed the final report compilation."
 
 class PlannerAgent:
     def __init__(self):

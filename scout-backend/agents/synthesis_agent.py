@@ -1,50 +1,131 @@
 import os
-from typing import List
+import logging
+import uuid
+from typing import List, Dict, AsyncGenerator
 from dotenv import load_dotenv
 
-load_dotenv()
-
-from strands import Agent
+from strands import Agent, tool
 from config.settings import settings
-from strands_tools import file_read, file_write
+from utils.event_queue import event_queue, StreamEvent
+from agents.shared_storage import report_filepaths_storage, storage_lock
+from strands_tools import file_read
 
+# Load environment variables
+load_dotenv()
+os.environ["BYPASS_TOOL_CONSENT"] = "true"
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+# --- Tool 1: Update Work Progress ---
+@tool
+async def update_work_progress(status: str, message: str, task: str) -> str:
+    """
+    Updates the work progress for the specialist agent monitor.
+    This tool is called by the agent to report its current status.
+    """
+    event = StreamEvent(
+        agentName="SynthesisAgent",
+        eventType="tool_call",
+        payload={
+            "tool_name": "update_work_progress",
+            "tool_input": {"status": status, "message": message, "task": task},
+            "display_message": f"{message}"
+        },
+        traceId=str(uuid.uuid4()),
+        spanId=str(uuid.uuid4()),
+        parentSpanId="planner"
+    )
+    try:
+        event_queue.get_queue().put_nowait(event.dict())
+    except Exception as e:
+        pass  # Only log errors if needed
+    return f"Work progress updated: {status} - {task}"
+
+# --- Tool 2: Save Final Report ---
+@tool
+def save_final_report(content: str) -> str:
+    """
+    Saves the final synthesized report to a file and adds the path to shared storage.
+    """
+    file_path = "reports/final_report.md"
+    with storage_lock:
+        if file_path not in report_filepaths_storage:
+            report_filepaths_storage.append(file_path)
+    try:
+        os.makedirs(os.path.dirname(file_path), exist_ok=True)
+        with open(file_path, 'w', encoding='utf-8') as f:
+            f.write(content)
+        # Send a final update to the frontend
+        event = StreamEvent(
+            agentName="SynthesisAgent",
+            eventType="tool_call",
+            payload={
+                "tool_name": "save_final_report",
+                "tool_input": {"file_path": file_path},
+                "display_message": "Final report generated and saved."
+            },
+            traceId=str(uuid.uuid4()),
+            spanId=str(uuid.uuid4()),
+            parentSpanId="planner"
+        )
+        event_queue.get_queue().put_nowait(event.dict())
+        return f"Final report saved successfully to {file_path}"
+    except Exception:
+        return f"Error saving final report."
+
+# --- Tool 3: Combine Reports ---
+@tool
+def combine_reports(filepaths: list, output_path: str = "reports/final_report.md") -> str:
+    """
+    Combines the contents of the given report files into a single Markdown file.
+    """
+    combined_content = ""
+    for path in filepaths:
+        if os.path.exists(path):
+            with open(path, 'r', encoding='utf-8') as f:
+                combined_content += f"\n\n---\n\n" + f.read()
+        else:
+            combined_content += f"\n\n---\n\n# Missing file: {path}\n"
+    os.makedirs(os.path.dirname(output_path), exist_ok=True)
+    with storage_lock:
+        with open(output_path, 'w', encoding='utf-8') as out:
+            out.write(combined_content)
+        if output_path not in report_filepaths_storage:
+            report_filepaths_storage.append(output_path)
+    return output_path
+
+# --- SynthesisAgent Class ---
 class SynthesisAgent:
     def __init__(self):
-        # Load AWS credentials (optional, but needed for Bedrock)
+        # Ensure AWS credentials are set for Bedrock
         if settings.aws_access_key_id:
             os.environ['AWS_ACCESS_KEY_ID'] = settings.aws_access_key_id
         if settings.aws_secret_access_key:
             os.environ['AWS_SECRET_ACCESS_KEY'] = settings.aws_secret_access_key
         if settings.aws_region:
             os.environ['AWS_DEFAULT_REGION'] = settings.aws_region
-
         self.agent = Agent(
             name="Synthesis Agent",
-            model=settings.bedrock_model_id,
-            system_prompt="""You are the Synthesis Agent. Your mission is to compile a final, comprehensive business report from the findings of other agents.
-
-            **Your process must be:**
-            1.  You will be given a list of file paths pointing to the reports from the specialist agents.
-            2.  **Read the reports:** For each file path in the list, you must call the `file_read` tool to get the content of that specific file.
-            3.  **Synthesize the content:** After reading all the files, analyze the combined information and create a single, cohesive, and well-structured final report in Markdown format. The report should have a clear title, an executive summary, and sections for each of the original analysis areas (Competition, Market, Pricing, Legal).
-            4.  **Save the final report:** Use the `file_write` tool to save the complete report to a file named `final_report.md` in the `reports/` directory.
-            5.  **Confirm completion:** Your final output should be a confirmation message stating that the synthesis is complete and the file has been saved.
-            """,
-            tools=[file_read, file_write]
+            model=settings.bedrock_model_id,  # Use LLM as in other agents
+            system_prompt="""
+You are the Synthesis Agent. Your job is to:
+1. Send a progress update ('started') when you receive the task.
+2. Combine the provided report files using the combine_reports tool.
+3. Send a progress update ('completed') when the final report is created.
+""",
+            tools=[combine_reports, update_work_progress]
         )
+        logger.info("✅ Synthesis Agent initialized.")
 
-    def run(self, filepaths: List[str]) -> str:
-        """Runs the agent to synthesize the reports from the given file paths."""
-        prompt = f"The reports from the specialist agents are located at the following paths: {filepaths}. Please read each one, synthesize them into a final report, and save it."
-        response = self.agent(prompt)
-        return str(response.message)
+    async def run(self, filepaths: list):
+        prompt = f"Received synthesis task. Please combine the following reports: {filepaths} and save the result as final_report.md. Send a progress update when you start and when you finish."
+        async for event in self.agent.stream_async(prompt):
+            yield event
 
-# Create a global instance of the agent
-synthesis_agent = SynthesisAgent()
-
-def run_synthesis_agent(filepaths: List[str]) -> str:
-    """
-    This function is the entry point for the Synthesis Agent.
-    It calls the run method on the global agent instance.
-    """
-    return synthesis_agent.run(filepaths)
+# --- Entry Point for Orchestrator ---
+async def run_synthesis_agent(filepaths: list):
+    agent = SynthesisAgent()
+    async for event in agent.run(filepaths):
+        yield event

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { ChevronDown, ChevronRight, CheckCircle2,  } from 'lucide-react';
+import { ChevronDown, ChevronRight, CheckCircle2 } from 'lucide-react';
+import ReportLink from './ReportLink';
 
 interface TodoList {
   competition_tasks: string[];
@@ -49,11 +50,12 @@ const Category: React.FC<CategoryProps> = ({ title, tasks, defaultExpanded = fal
 
 interface PlanComponentProps {
   todoList: TodoList | null;
+  generatedReports?: { name: string; path: string }[];
 }
 
-const PlanComponent: React.FC<PlanComponentProps> = ({ todoList }) => {
-  // Check if there are any tasks in the todo list
+const PlanComponent: React.FC<PlanComponentProps> = ({ todoList, generatedReports = [] }) => {
   const hasTasks = todoList && Object.values(todoList).some(category => category.length > 0);
+  const hasReports = generatedReports && generatedReports.length > 0;
 
   return (
     <div className="flex flex-col bg-white rounded-xl max-h-[80vh]">
@@ -90,7 +92,16 @@ const PlanComponent: React.FC<PlanComponentProps> = ({ todoList }) => {
         )}
       </div>
       
-      {/* Removed note about passing plan to Orchestrator Agent */}
+      {hasReports && (
+        <div className="p-4 border-t border-gray-200">
+          <h3 className="text-sm font-medium text-gray-700 mb-2">Generated Reports</h3>
+          <div className="space-y-2">
+            {generatedReports.map(report => (
+              <ReportLink key={report.path} report={report} />
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 };
