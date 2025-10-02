@@ -21,8 +21,7 @@ const ReportLink: React.FC<ReportLinkProps> = ({ report, className = "" }) => {
       type="button"
       onClick={handleDownload}
       title={report.name}
-      className={`flex items-center bg-green-50 border border-green-700 rounded-md px-2 py-1 text-xs transition-all duration-300 cursor-pointer max-w-[160px] focus:outline-none focus:ring-2 focus:ring-green-700 hover:bg-green-100 hover:shadow-md hover:border-green-900 ${className}`}
-
+      className={`flex items-center bg-green-50 border border-green-700 rounded-md px-3 py-2 text-xs transition-all duration-300 cursor-pointer focus:outline-none focus:ring-2 focus:ring-green-700 hover:bg-green-100 hover:shadow-md hover:border-green-900 ${className}`}
     >
       <FileText className="w-4 h-4 text-green-700 flex-shrink-0 mr-1" />
       <span

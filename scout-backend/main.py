@@ -20,8 +20,6 @@ from agents.competition_agent import run_competition_agent
 import asyncio
 
 from fastapi.responses import StreamingResponse, FileResponse
-from fpdf import FPDF
-import markdown
 import io
 import os
 from agents.shared_storage import report_filepaths_storage, storage_lock
@@ -253,7 +251,7 @@ async def specialist_stream():
 
 @app.get("/api/reports/{report_name}")
 async def get_report_as_pdf(report_name: str):
-    """Converts a markdown report to PDF and streams it.
+    """Converts a markdown report to PDF with enhanced formatting and streams it.
     Expects a report name like 'competition_report.md'"""
     # Basic security check to prevent path traversal
     if ".." in report_name or not report_name.endswith(".md"):
@@ -268,34 +266,16 @@ async def get_report_as_pdf(report_name: str):
         with open(file_path, 'r', encoding='utf-8') as f:
             markdown_content = f.read()
 
-        # Convert markdown to plain text
-        from markdown import markdown as md_to_html
-        from fpdf import FPDF
-        import re
-
-        # Remove HTML tags for a simple text PDF
-        html_content = md_to_html(markdown_content)
-        text_content = re.sub('<[^<]+?>', '', html_content)
-
-        pdf = FPDF()
-        pdf.add_page()
-        pdf.set_auto_page_break(auto=True, margin=15)
-        pdf.set_font("Arial", size=12)
-
-        # Split text into lines and add to PDF
-        for line in text_content.splitlines():
-            pdf.cell(0, 10, line, ln=True)
-
-        temp_pdf_path = "temp_report.pdf"
-        pdf.output(temp_pdf_path)
-
-        with open(temp_pdf_path, 'rb') as f:
-            pdf_bytes = f.read()
-
+        # Use enhanced PDF generator with report-specific styling
+        from utils.pdf_generator import generate_report_specific_pdf, add_report_metadata
+        
+        # Add metadata to the report
+        enhanced_content = add_report_metadata(markdown_content, report_name)
+        
+        # Generate enhanced PDF with report-specific styling
+        pdf_bytes = generate_report_specific_pdf(enhanced_content, report_name)
+        
         pdf_stream = io.BytesIO(pdf_bytes)
-
-        if os.path.exists(temp_pdf_path):
-            os.remove(temp_pdf_path)
 
         return StreamingResponse(
             pdf_stream,
@@ -306,6 +286,55 @@ async def get_report_as_pdf(report_name: str):
     except Exception as e:
         logger.error(f"Failed to convert report to PDF: {e}")
         raise HTTPException(status_code=500, detail="Failed to convert report to PDF")
+
+
+@app.get("/api/test-pdf")
+async def test_pdf_generation():
+    """Test endpoint to verify PDF generation works with sample content."""
+    try:
+        from utils.pdf_generator import generate_enhanced_pdf
+        
+        sample_content = """
+# Test Report
+
+## Overview
+This is a test of the enhanced PDF generation system.
+
+### Features
+- Professional formatting
+- Table support
+- Code blocks
+- Lists and more
+
+| Feature | Status |
+|---------|--------|
+| Headers | ✓ |
+| Tables | ✓ |
+| Lists | ✓ |
+
+> This is a quote block to test styling.
+
+```python
+def hello_world():
+    print("Hello, World!")
+```
+
+**Bold text** and *italic text* are supported.
+"""
+        
+        pdf_bytes = generate_enhanced_pdf(sample_content, "Test Report")
+        pdf_stream = io.BytesIO(pdf_bytes)
+        
+        return StreamingResponse(
+            pdf_stream,
+            media_type="application/pdf",
+            headers={"Content-Disposition": "attachment; filename=test_report.pdf"}
+        )
+        
+    except Exception as e:
+        logger.error(f"Failed to generate test PDF: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to generate test PDF: {str(e)}")
+
 
 if __name__ == "__main__":
     uvicorn.run(

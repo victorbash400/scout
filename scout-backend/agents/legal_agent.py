@@ -4,6 +4,7 @@ import logging
 from typing import List, Dict, AsyncGenerator
 from dotenv import load_dotenv
 import uuid
+from datetime import datetime
 
 from strands import Agent, tool
 from config.settings import settings
@@ -23,7 +24,80 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
-# --- Tool: Update Work Progress ---
+# --- Tool 1: Get Legal Requirements ---
+@tool
+def get_legal_requirements(business_type: str, area: str) -> str:
+    """
+    Fetches real legal requirements and compliance data using Tavily search API.
+
+    Args:
+        business_type: The type of business (e.g., "bakery", "gym")
+        area: The geographic area to analyze (e.g., "Nairobi, Kenya")
+
+    Returns:
+        Legal compliance requirements including licenses, permits, and regulations.
+    """
+    import requests
+    import json
+    from datetime import datetime
+    
+    api_key = os.getenv("TAVILY_API_KEY")
+    if not api_key:
+        return "Error: TAVILY_API_KEY is not configured."
+    
+    try:
+        # Search for legal requirements using Tavily
+        search_query = f"{business_type} business license permits legal requirements {area} regulations compliance"
+        
+        url = "https://api.tavily.com/search"
+        headers = {"Content-Type": "application/json"}
+        data = {
+            "api_key": api_key,
+            "query": search_query,
+            "search_depth": "advanced",
+            "include_answer": True,
+            "include_raw_content": False,
+            "max_results": 5
+        }
+        
+        response = requests.post(url, headers=headers, json=data)
+        response.raise_for_status()
+        search_results = response.json()
+        
+        # Extract legal insights from search results
+        legal_insights = []
+        if "results" in search_results:
+            for result in search_results["results"][:3]:  # Top 3 results
+                title = result.get("title", "")
+                content = result.get("content", "")
+                url = result.get("url", "")
+                legal_insights.append(f"- **{title}**: {content[:200]}... (Source: {url})")
+        
+        # Get the AI-generated answer if available
+        answer = search_results.get("answer", "No specific legal requirements found.")
+        
+        legal_info = f"""
+Legal Requirements for {business_type} in {area}:
+
+**Legal Research Summary:**
+{answer}
+
+**Key Legal Requirements:**
+{chr(10).join(legal_insights)}
+
+**Analysis Date:** {datetime.now().strftime('%Y-%m-%d')}
+"""
+        return legal_info
+        
+    except requests.exceptions.RequestException as e:
+        logger.error(f"Tavily API request failed: {e}")
+        return f"Error: Failed to fetch legal data from Tavily API. {e}"
+    except Exception as e:
+        logger.error(f"Unexpected error in get_legal_requirements: {e}")
+        return f"Error: Unexpected error occurred while fetching legal data. {e}"
+
+
+# --- Tool 2: Update Work Progress ---
 @tool
 async def update_work_progress(status: str, message: str, task: str) -> str:
     """
@@ -110,19 +184,28 @@ class LegalAgent:
         self.agent = Agent(
             name="Legal Agent",
             model=settings.bedrock_model_id,
-            system_prompt="""You are the Legal Agent. Your mission is to generate a legal compliance report for a new business. You must use the provided tools in a logical sequence and report your progress using the update_work_progress tool.
+            system_prompt="""You are the Legal Compliance Specialist. Your mission is to generate a comprehensive, professionally formatted legal compliance report for a new business in a specific location.
 
             **Your process must be:**
             1.  **Report STARTED:** Use `update_work_progress` with status 'started' to indicate you've begun the task.
             2.  **Explain your approach:** Briefly explain how you'll analyze the legal requirements for the business.
             3.  **Report IN PROGRESS:** Use `update_work_progress` with status 'in_progress' to indicate you're gathering legal compliance data.
-            4.  **Report COMPLETED:** Use `update_work_progress` with status 'completed' to indicate the legal analysis is done.
-            5.  **Save the result:** Use the `save_legal_report` tool to save the legal compliance analysis to a file named `legal_report.md` in the `reports/` directory.
+            4.  **Call `get_legal_requirements`:** Use this tool EXACTLY ONCE to get legal requirements - make only ONE API call for speed and cost efficiency.
+            5.  **Report COMPLETED:** Use `update_work_progress` with status 'completed' to indicate the legal analysis is done.
+            6.  **Save the result:** Use the `save_legal_report` tool to save the legal compliance analysis to a file named `legal_report.md` in the `reports/` directory.
+
+            **REPORT FORMAT:** Create a professional markdown report with:
+            - # Main title
+            - ## Section headers (Executive Summary, Key Requirements, Compliance Steps, Costs, Sources)
+            - Use bullet points and simple tables for licenses/permits
+            - Include specific legal requirements from research
+            - Include sources and legal disclaimer at the bottom (try to use actual links to sources if possible)
+            - Keep it practical and actionable
             
-            Remember to be conservative with resources - only use the update_work_progress and save_legal_report tools.
-            Be very explicit about using the update_work_progress tool at each major step to report status to the monitor.
+            Be conservative with resources - make only ONE data tool call per agent run.
             """,
             tools=[
+                get_legal_requirements,
                 update_work_progress,
                 save_legal_report
             ]
@@ -134,7 +217,8 @@ class LegalAgent:
         prompt = (
             f"Generate a legal compliance report for a new '{business_type}' in '{area}'. "
             "Follow your instructions precisely to gather legal requirements and compliance data, "
-            "then save the final report to a file."
+            "then combine everything into a final summary and save it to a file. "
+            "Make only ONE call to get_legal_requirements to be conservative with API usage."
         )
         
         async for event in self.agent.stream_async(prompt):

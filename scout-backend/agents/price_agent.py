@@ -3,6 +3,7 @@ import logging
 from typing import List, Dict, AsyncGenerator
 from dotenv import load_dotenv
 import uuid
+from datetime import datetime
 
 from strands import Agent, tool
 from config.settings import settings
@@ -26,7 +27,7 @@ logger = logging.getLogger(__name__)
 @tool
 def get_pricing_data(business_type: str, area: str) -> str:
     """
-    Fetches pricing data and competitive pricing analysis for a specified business type in a specific area.
+    Fetches real pricing data and competitive pricing analysis using Tavily search API.
 
     Args:
         business_type: The type of business (e.g., "bakery", "gym")
@@ -35,18 +36,63 @@ def get_pricing_data(business_type: str, area: str) -> str:
     Returns:
         Pricing analysis including average prices, competitive pricing, and price positioning recommendations.
     """
-    # Simulated pricing data - in a real implementation, this would call actual APIs
-    pricing_info = f"""
-    Pricing Analysis for {business_type} in {area}:
+    import requests
+    import json
     
-    - Average Price Point: Moderate
-    - Competitive Landscape: Mid-range to premium pricing
-    - Price Sensitivity: Medium
-    - Premium Pricing Opportunities: For specialty/differentiated offerings
-    - Volume Pricing Strategy: Recommended for higher-volume items
-    - Seasonal Pricing: Potential for higher margins during peak seasons
-    """
-    return pricing_info
+    api_key = os.getenv("TAVILY_API_KEY")
+    if not api_key:
+        return "Error: TAVILY_API_KEY is not configured."
+    
+    try:
+        # Search for pricing information using Tavily
+        search_query = f"{business_type} pricing costs rates {area} market analysis"
+        
+        url = "https://api.tavily.com/search"
+        headers = {"Content-Type": "application/json"}
+        data = {
+            "api_key": api_key,
+            "query": search_query,
+            "search_depth": "advanced",
+            "include_answer": True,
+            "include_raw_content": False,
+            "max_results": 5
+        }
+        
+        response = requests.post(url, headers=headers, json=data)
+        response.raise_for_status()
+        search_results = response.json()
+        
+        # Extract pricing insights from search results
+        pricing_insights = []
+        if "results" in search_results:
+            for result in search_results["results"][:3]:  # Top 3 results
+                title = result.get("title", "")
+                content = result.get("content", "")
+                url = result.get("url", "")
+                pricing_insights.append(f"- **{title}**: {content[:200]}... (Source: {url})")
+        
+        # Get the AI-generated answer if available
+        answer = search_results.get("answer", "No specific pricing data found.")
+        
+        pricing_info = f"""
+Pricing Analysis for {business_type} in {area}:
+
+**Market Research Summary:**
+{answer}
+
+**Key Pricing Insights:**
+{chr(10).join(pricing_insights)}
+
+**Analysis Date:** {datetime.now().strftime('%Y-%m-%d')}
+"""
+        return pricing_info
+        
+    except requests.exceptions.RequestException as e:
+        logger.error(f"Tavily API request failed: {e}")
+        return f"Error: Failed to fetch pricing data from Tavily API. {e}"
+    except Exception as e:
+        logger.error(f"Unexpected error in get_pricing_data: {e}")
+        return f"Error: Unexpected error occurred while fetching pricing data. {e}"
 
 
 # --- Tool 2: Update Work Progress ---
@@ -137,18 +183,24 @@ class PriceAgent:
         self.agent = Agent(
             name="Price Agent",
             model=settings.bedrock_model_id,
-            system_prompt="""You are a meticulous Pricing Analyst. Your mission is to generate a pricing analysis report for a new business in a specific location. You must use the provided tools in a logical sequence and report your progress using the update_work_progress tool.
+            system_prompt="""You are a meticulous Pricing Analyst. Your mission is to generate a comprehensive, professionally formatted pricing analysis report for a new business in a specific location.
 
             **Your process must be:**
             1.  **Report STARTED:** Use `update_work_progress` with status 'started' to indicate you've begun the task.
             2.  **Explain your approach:** Briefly explain how you'll analyze the pricing for the business.
             3.  **Report IN PROGRESS:** Use `update_work_progress` with status 'in_progress' to indicate you're gathering pricing data.
-            4.  **Call `get_pricing_data`:** Use this tool ONCE to get pricing data for the specified business type in the area - make only ONE search and be conservative with API usage.
+            4.  **Call `get_pricing_data`:** Use this tool EXACTLY ONCE to get pricing data - make only ONE API call for speed and cost efficiency.
             5.  **Report COMPLETED:** Use `update_work_progress` with status 'completed' to indicate the pricing analysis is done.
             6.  **Save the result:** Use the `save_price_report` tool to save the pricing analysis to a file named `price_report.md` in the `reports/` directory.
+
+            **REPORT FORMAT:** Create a professional markdown report with:
+            - # Main title
+            - ## Section headers for key areas (Executive Summary, Analysis, Recommendations, Sources)
+            - Use bullet points and tables where helpful
+            - Include specific data and sources at the bottom (try to use actual links to sources if possible)  
+            - Keep it concise but comprehensive
             
-            Remember to be conservative with resources - only use the get_pricing_data and save_price_report tools.
-            Be very explicit about using the update_work_progress tool at each major step to report status to the monitor.
+            Be conservative with resources - make only ONE data tool call per agent run.
             """,
             tools=[
                 get_pricing_data,

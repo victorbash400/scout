@@ -13,13 +13,13 @@ interface StreamEvent {
 }
 
 interface Report {
-  name: string;
-  path: string;
+    name: string;
+    path: string;
 }
 
 interface UpdateComponentProps {
-  onNewEvent?: (event: StreamEvent) => void;
-  generatedReports?: Report[];
+    onNewEvent?: (event: StreamEvent) => void;
+    generatedReports?: Report[];
 }
 
 const UpdateComponent: React.FC<UpdateComponentProps> = ({ onNewEvent, generatedReports = [] }) => {
@@ -34,7 +34,7 @@ const UpdateComponent: React.FC<UpdateComponentProps> = ({ onNewEvent, generated
             const newEvent: StreamEvent = JSON.parse(event.data);
             setEvents(prevEvents => [...prevEvents, newEvent]);
             if (onNewEvent) {
-              onNewEvent(newEvent);
+                onNewEvent(newEvent);
             }
         };
 
@@ -54,7 +54,6 @@ const UpdateComponent: React.FC<UpdateComponentProps> = ({ onNewEvent, generated
     }, [events]);
 
     const renderEvent = (event: StreamEvent, index: number) => {
-        const isLastEvent = index === events.length - 1;
         const isProgressEvent = event.eventType === 'tool_call' && event.payload.tool_name === 'update_work_progress' && event.payload.display_message;
         // Find all progress events for vertical line
         const progressEvents = events.filter(e => e.eventType === 'tool_call' && e.payload.tool_name === 'update_work_progress' && e.payload.display_message);
@@ -68,8 +67,8 @@ const UpdateComponent: React.FC<UpdateComponentProps> = ({ onNewEvent, generated
                 return null;
             case 'thought_delta':
                 return (
-                    <span 
-                        key={event.eventId} 
+                    <span
+                        key={event.eventId}
                         className={`text-sm text-gray-800 relative`}
                     >
                         {event.payload.text}
@@ -83,10 +82,10 @@ const UpdateComponent: React.FC<UpdateComponentProps> = ({ onNewEvent, generated
                     return (
                         <div key={event.eventId} className="flex items-stretch text-xs text-gray-800 min-h-10">
                             {/* Timeline indicator column */}
-                            <div className="flex flex-col items-center mr-4" style={{minWidth: '24px'}}>
+                            <div className="flex flex-col items-center mr-4" style={{ minWidth: '24px' }}>
                                 {/* Top connector */}
                                 <div className={`w-px flex-grow ${progressIndex > 0 ? 'bg-gray-300' : ''}`} />
-                                
+
                                 {/* Status indicator */}
                                 <div className="w-4 h-4 flex-shrink-0 flex items-center justify-center z-10">
                                     {isCompleted ? (
@@ -105,7 +104,7 @@ const UpdateComponent: React.FC<UpdateComponentProps> = ({ onNewEvent, generated
                                 {/* Bottom connector */}
                                 <div className={`w-px flex-grow ${progressIndex < progressEvents.length - 1 ? 'bg-gray-300' : ''}`} />
                             </div>
-                            
+
                             {/* Content area */}
                             <div className="flex-1 py-1">
                                 <span className={isCurrent ? 'shimmer-effect' : ''}>
@@ -151,22 +150,25 @@ const UpdateComponent: React.FC<UpdateComponentProps> = ({ onNewEvent, generated
                     <div className="flex items-center justify-center h-full text-xs text-gray-400">Waiting for agent activity...</div>
                 )}
             </div>
-            
-                        {/* Show generated reports at the bottom of the Update Component */}
-                        {generatedReports.length > 0 && (
-                                                <div className="p-3 border-t border-gray-200 flex items-center gap-2 min-h-[40px]">
-                                                    <span className="text-xs text-gray-600 mr-2">Reports:</span>
-                                                    <div className="flex gap-2 overflow-x-auto scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100">
-                                                        {generatedReports.map(report => (
-                                                            <ReportLink
-                                                                key={report.path}
-                                                                report={report}
-                                                                className=""
-                                                            />
-                                                        ))}
-                                                    </div>
-                                                </div>
-                        )}
+
+            {/* Show generated reports at the bottom of the Update Component */}
+            {generatedReports.length > 0 && (
+                <div className="p-3 border-t border-gray-200">
+                    <div className="flex items-center gap-2 mb-2">
+                        <span className="text-xs text-gray-600 font-medium">Generated Reports</span>
+                        <span className="text-xs text-gray-400">({generatedReports.length})</span>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        {generatedReports.map(report => (
+                            <ReportLink
+                                key={report.path}
+                                report={report}
+                                className="w-full"
+                            />
+                        ))}
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

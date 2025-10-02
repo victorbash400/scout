@@ -107,7 +107,7 @@ const ChatSection: React.FC<ChatSectionProps> = ({
         </div>
         
         {/* Bottom chat input */}
-        <div>
+        <div className="pb-4">
           <div className="max-w-2xl mx-auto">
             <ChatInput 
               onSendMessage={onSendMessage} 

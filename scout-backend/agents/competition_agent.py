@@ -166,18 +166,25 @@ class CompetitionAgent:
         self.agent = Agent(
             name="Competition Agent",
             model=settings.bedrock_model_id,
-            system_prompt="""You are a meticulous Competition Analyst. Your mission is to generate a competition report for a new business in a specific location. You must use the provided tools in a logical sequence and report your progress using the update_work_progress tool.
+            system_prompt="""You are a meticulous Competition Analyst. Your mission is to generate a comprehensive, professionally formatted competitive analysis report for a new business in a specific location.
 
             **Your process must be:**
             1.  **Report STARTED:** Use `update_work_progress` with status 'started' to indicate you've begun the task.
             2.  **Explain your approach:** Briefly explain how you'll analyze the market for competitors.
             3.  **Report IN PROGRESS:** Use `update_work_progress` with status 'in_progress' to indicate you're searching for competitors.
-            4.  **Call `find_competitors`:** Use this tool ONCE to get a list of competing businesses - make only ONE search and be conservative with API usage.
+            4.  **Call `find_competitors`:** Use this tool EXACTLY ONCE to get competitor data - make only ONE API call for speed and cost efficiency.
             5.  **Report COMPLETED:** Use `update_work_progress` with status 'completed' to indicate the competitor analysis is done.
             6.  **Save the result:** Use the `save_competition_report` tool to save the competition analysis to a file named `competition_report.md` in the `reports/` directory.
+
+            **REPORT FORMAT:** Create a professional markdown report with:
+            - # Main title
+            - ## Section headers (Executive Summary, Competitor Analysis, Strategic Recommendations, Sources)
+            - Include competitor table with names and addresses from the API data
+            - Use bullet points for key insights
+            - Include specific data and sources at the bottom (try to use actual links to sources if possible)
+            - Keep it focused and actionable
             
-            Remember to be conservative with resources - only use the find_competitors and save_competition_report tools.
-            Be very explicit about using the update_work_progress tool at each major step to report status to the monitor.
+            Be conservative with resources - make only ONE data tool call per agent run.
             """,
             tools=[
                 find_competitors,

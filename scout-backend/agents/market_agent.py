@@ -26,7 +26,7 @@ logger = logging.getLogger(__name__)
 @tool
 def get_market_data(business_type: str, area: str) -> str:
     """
-    Fetches market data for a specified business type in a specific area.
+    Fetches real market data using Tavily search API for comprehensive market analysis.
 
     Args:
         business_type: The type of business (e.g., "bakery", "gym")
@@ -35,18 +35,64 @@ def get_market_data(business_type: str, area: str) -> str:
     Returns:
         Market data analysis including size, trends, and growth potential.
     """
-    # Simulated market data - in a real implementation, this would call actual APIs
-    market_info = f"""
-    Market Analysis for {business_type} in {area}:
+    import requests
+    import json
+    from datetime import datetime
     
-    - Market Size: Medium
-    - Growth Potential: High
-    - Key Trends: Consumer preference for local products, premium offerings
-    - Customer Demographics: Age 25-45, Middle to upper income
-    - Seasonal Variations: Higher demand during holidays and weekends
-    - Average Price Points: Mid-range to premium
-    """
-    return market_info
+    api_key = os.getenv("TAVILY_API_KEY")
+    if not api_key:
+        return "Error: TAVILY_API_KEY is not configured."
+    
+    try:
+        # Search for market data using Tavily
+        search_query = f"{business_type} market size trends growth {area} industry analysis demographics"
+        
+        url = "https://api.tavily.com/search"
+        headers = {"Content-Type": "application/json"}
+        data = {
+            "api_key": api_key,
+            "query": search_query,
+            "search_depth": "advanced",
+            "include_answer": True,
+            "include_raw_content": False,
+            "max_results": 5
+        }
+        
+        response = requests.post(url, headers=headers, json=data)
+        response.raise_for_status()
+        search_results = response.json()
+        
+        # Extract market insights from search results
+        market_insights = []
+        if "results" in search_results:
+            for result in search_results["results"][:3]:  # Top 3 results
+                title = result.get("title", "")
+                content = result.get("content", "")
+                url = result.get("url", "")
+                market_insights.append(f"- **{title}**: {content[:200]}... (Source: {url})")
+        
+        # Get the AI-generated answer if available
+        answer = search_results.get("answer", "No specific market data found.")
+        
+        market_info = f"""
+Market Analysis for {business_type} in {area}:
+
+**Market Research Summary:**
+{answer}
+
+**Key Market Insights:**
+{chr(10).join(market_insights)}
+
+**Analysis Date:** {datetime.now().strftime('%Y-%m-%d')}
+"""
+        return market_info
+        
+    except requests.exceptions.RequestException as e:
+        logger.error(f"Tavily API request failed: {e}")
+        return f"Error: Failed to fetch market data from Tavily API. {e}"
+    except Exception as e:
+        logger.error(f"Unexpected error in get_market_data: {e}")
+        return f"Error: Unexpected error occurred while fetching market data. {e}"
 
 
 # --- Tool 2: Update Work Progress ---
@@ -137,18 +183,25 @@ class MarketAgent:
         self.agent = Agent(
             name="Market Agent",
             model=settings.bedrock_model_id,
-            system_prompt="""You are a meticulous Market Analyst. Your mission is to generate a market analysis report for a new business in a specific location. You must use the provided tools in a logical sequence and report your progress using the update_work_progress tool.
+            system_prompt="""You are a meticulous Market Analyst. Your mission is to generate a comprehensive, professionally formatted market analysis report for a new business in a specific location.
 
             **Your process must be:**
             1.  **Report STARTED:** Use `update_work_progress` with status 'started' to indicate you've begun the task.
             2.  **Explain your approach:** Briefly explain how you'll analyze the market for the business.
             3.  **Report IN PROGRESS:** Use `update_work_progress` with status 'in_progress' to indicate you're gathering market data.
-            4.  **Call `get_market_data`:** Use this tool ONCE to get market data for the specified business type in the area - make only ONE search and be conservative with API usage.
+            4.  **Call `get_market_data`:** Use this tool EXACTLY ONCE to get market data - make only ONE API call for speed and cost efficiency.
             5.  **Report COMPLETED:** Use `update_work_progress` with status 'completed' to indicate the market analysis is done.
             6.  **Save the result:** Use the `save_market_report` tool to save the market analysis to a file named `market_report.md` in the `reports/` directory.
+
+            **REPORT FORMAT:** Create a professional markdown report with:
+            - # Main title
+            - ## Section headers (Executive Summary, Market Analysis, Opportunities, Recommendations, Sources)
+            - Use bullet points and simple tables where helpful
+            - Include specific market data from research
+            - Include sources and methodology at the bottom (try to use actual links to sources if possible)
+            - Keep it concise but insightful
             
-            Remember to be conservative with resources - only use the get_market_data and save_market_report tools.
-            Be very explicit about using the update_work_progress tool at each major step to report status to the monitor.
+            Be conservative with resources - make only ONE data tool call per agent run.
             """,
             tools=[
                 get_market_data,
