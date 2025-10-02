@@ -2,7 +2,7 @@
 
 <div align="center">
 
-[![AWS AI Agent Global Hackathon](https://img.shields.io/badge/AWS-AI%20Agent%20Hackathon-orange?style=for-the-badge&logo=amazon-aws)](https://github.com/victorbash400/scout)
+
 [![Powered by Strands SDK](https://img.shields.io/badge/Powered%20by-Strands%20SDK-blue?style=for-the-badge)](https://strandsagents.com)
 [![AgentCore Deployment](https://img.shields.io/badge/Deployed%20on-AgentCore-green?style=for-the-badge)](https://agentcore.aws)
 
@@ -10,7 +10,7 @@
 
 *Empowering businesses and startups to venture into new markets with confidence*
 
-[🎯 Live Demo](#-quick-start) • [📖 Documentation](#-how-it-works) • [🛠️ Setup](#-installation) • [🎥 Demo Video](#-demo)
+[📖 Documentation](#-how-it-works) • [🛠️ Setup](#-installation)
 
 </div>
 
@@ -18,7 +18,7 @@
 
 ## 🌟 What is SCOUT?
 
-SCOUT is an intelligent market research platform that helps businesses and startups make informed decisions when entering new markets or launching new products. Built for the **AWS AI Agent Global Hackathon**, SCOUT leverages the power of **Strands SDK** and **AWS Bedrock** to provide comprehensive market intelligence through AI-powered research agents.
+SCOUT is an intelligent market research platform that helps businesses and startups make informed decisions when entering new markets or launching new products. SCOUT leverages the power of **Strands SDK** and **AWS Bedrock** to provide comprehensive market intelligence through AI-powered research agents.
 
 ### 🎯 Core Mission
 > **"Making sure your bases are covered before you leap"**
@@ -262,43 +262,12 @@ The Synthesis Agent combines all research findings into a comprehensive, actiona
 Generate beautifully formatted PDF reports with:
 - Executive summaries
 - Detailed analysis sections
-- Data visualizations
 - Actionable recommendations
 - Source citations
 
 ---
 
-## 🎮 Usage Examples
 
-### 💬 Chat Mode Example
-```
-User: "What should I consider before opening a coffee shop in downtown Seattle?"
-
-SCOUT: "Great question! Here are the key factors to consider:
-
-1. **Market Saturation**: Seattle has a high density of coffee shops
-2. **Local Preferences**: Strong preference for specialty/artisan coffee
-3. **Foot Traffic**: Downtown areas have high morning/lunch rushes
-4. **Competition**: Major players include Starbucks, local roasters
-5. **Regulations**: Food service permits, health department requirements
-
-Would you like me to run a comprehensive analysis using Agent Mode?"
-```
-
-### 🤖 Agent Mode Example
-```
-User: "Run a full market analysis for a specialty coffee shop in downtown Seattle"
-
-SCOUT Agent Mode:
-✅ Analyzing business requirements...
-🔍 Market Agent: Researching Seattle coffee market trends
-🏢 Competition Agent: Mapping nearby coffee shops  
-💰 Price Agent: Analyzing local pricing strategies
-⚖️ Legal Agent: Researching permits and regulations
-📊 Synthesis Agent: Compiling comprehensive report
-
-📄 Final Report: seattle_coffee_shop_analysis.pdf
-```
 
 ---
 
@@ -311,15 +280,17 @@ For demonstration purposes, SCOUT is configured with optimized settings:
 - **Real-time Updates**: Live progress tracking via WebSocket streams
 - **Quick Turnaround**: Complete analysis in under 5 minutes
 
-### 🔧 Production Enhancements Available
+### 🔧 Advanced Capabilities
 
-SCOUT can be enhanced with additional tools for deeper research:
+SCOUT agents include comprehensive analysis capabilities that can be enabled by adjusting system prompts:
 
-- **Social Media Analysis**: Sentiment analysis and trend monitoring
-- **Financial Modeling**: Revenue projections and ROI calculations  
-- **Supply Chain Analysis**: Vendor and logistics research
-- **Customer Surveys**: Automated market research surveys
-- **Regulatory Deep Dive**: Comprehensive legal compliance analysis
+- **Image Analysis**: Visual content processing and interpretation
+- **Document Processing**: Advanced PDF and document analysis
+- **Multi-modal Research**: Combined text, image, and data analysis
+- **Extended API Integration**: Additional data sources and research tools
+- **Deep Analysis Modes**: More thorough research with increased API calls
+
+*Note: Advanced features require higher API usage and longer processing times.*
 
 ---
 
@@ -334,11 +305,7 @@ SCOUT is designed for seamless deployment on **AWS AgentCore**, leveraging:
 
 ---
 
-## 🎥 Demo
 
-[🎬 Watch SCOUT in Action](https://github.com/victorbash400/scout)
-
-See how SCOUT transforms a simple business idea into a comprehensive market intelligence report in minutes.
 
 ---
 
@@ -369,22 +336,15 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ---
 
-## 🏆 AWS AI Agent Global Hackathon
+## 🏗️ Technical Excellence
 
-SCOUT was created for the **AWS AI Agent Global Hackathon** to demonstrate:
+SCOUT demonstrates advanced AI agent orchestration capabilities:
 
 - **Multi-Agent Orchestration** using Strands SDK
 - **AWS Bedrock Integration** for advanced AI capabilities
 - **Real-world Business Applications** of AI agents
 - **Scalable Architecture** suitable for production deployment
-
-### 🎯 Hackathon Goals Achieved
-
-✅ **Innovation**: Novel approach to market research automation  
-✅ **Technical Excellence**: Robust multi-agent architecture  
-✅ **Business Value**: Practical solution for real market challenges  
-✅ **AWS Integration**: Deep integration with AWS services  
-✅ **Scalability**: Built for enterprise deployment on AgentCore  
+- **Enterprise-Ready** with robust error handling and monitoring  
 
 ---
 
@@ -392,7 +352,7 @@ SCOUT was created for the **AWS AI Agent Global Hackathon** to demonstrate:
 
 **🚀 Ready to scout your next market opportunity?**
 
-[Get Started](https://github.com/victorbash400/scout) • [View Demo](#-demo) • [Join the Discussion](https://github.com/victorbash400/scout/discussions)
+[Get Started](https://github.com/victorbash400/scout)
 
 ---
 
