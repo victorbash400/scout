@@ -4,6 +4,7 @@ import ChatSection from './chat/chatsection';
 import ChatInput from './chat/chatinput';
 import Sidebar from './components/sidebar';
 import { getTimeBasedGreeting } from './data/greetings';
+import welcomeImage from './assets/welcome.png';
 
 interface Message {
   role: 'user' | 'assistant';
@@ -198,7 +199,7 @@ function App() {
     setFileContext(null);
     setHasStarted(false);
     setTodoList(null);
-    setIsOrchestratorActive(false);
+
     
     try {
       await fetch('http://localhost:8000/api/context/clear', { method: 'POST' });
@@ -402,8 +403,19 @@ function App() {
 
   if (!hasStarted) {
     return (
-      <div className="h-screen flex flex-col items-center justify-center relative" style={{backgroundColor: '#fdfdf1'}}>
-        {/* Scout icon and word removed in welcome mode */}
+      <div 
+        className="h-screen flex flex-col items-center justify-center relative" 
+        style={{
+          backgroundImage: `url(${welcomeImage})`,
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
+          backgroundRepeat: 'no-repeat'
+        }}
+      >
+        <div className="absolute top-6 left-6 flex items-center gap-3 z-30">
+          <img src="/scout-favicon.svg" alt="Scout" className="w-6 h-6" />
+          <h1 className="text-2xl font-light text-gray-800">Scout</h1>
+        </div>
         <div className="w-full max-w-2xl px-6">
           <div className="text-center mb-8">
             <p className="text-2xl text-gray-700 font-medium">{getTimeBasedGreeting()}</p>
