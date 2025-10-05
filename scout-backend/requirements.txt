@@ -71,7 +71,6 @@ PyPDF2==3.0.1
 python-dateutil==2.9.0.post0
 python-dotenv==1.1.1
 python-multipart==0.0.20
-pywin32==311
 PyYAML==6.0.2
 readabilipy==0.3.0
 redis==6.4.0
