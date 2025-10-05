@@ -5,6 +5,8 @@ env/
 ENV/
 .venv/
 .env/
+testvenv/
+test_minimal_env/
 
 # Environment Variables
 .env
