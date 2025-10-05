@@ -23,7 +23,7 @@ class Settings(BaseSettings):
     debug: bool = False
     
     # AWS Configuration
-    aws_region: str = "eu-north-1"
+    aws_region: str = "eu-central-1"
     aws_access_key_id: str = Field(default="", env="AWS_ACCESS_KEY_ID")
     aws_secret_access_key: str = Field(default="", env="AWS_SECRET_ACCESS_KEY")
     

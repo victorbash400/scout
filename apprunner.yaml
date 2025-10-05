@@ -1,12 +1,12 @@
 version: 1.0
-runtime: docker
+runtime: python3
 build:
   commands:
     build:
-      - echo "Building SCOUT application..."
+      - pip install -r scout-backend/requirements.txt
 run:
-  runtime-version: latest
-  command: uvicorn main:app --host 0.0.0.0 --port 8000
+  runtime-version: 3.11
+  command: cd scout-backend && uvicorn main:app --host 0.0.0.0 --port 8000
   network:
     port: 8000
     env: PORT
@@ -14,6 +14,6 @@ run:
     - name: PORT
       value: "8000"
     - name: AWS_REGION
-      value: "us-west-2"
+      value: "eu-central-1"
     - name: STORAGE_BACKEND
       value: "local"
