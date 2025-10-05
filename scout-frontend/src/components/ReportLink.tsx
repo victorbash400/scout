@@ -13,7 +13,7 @@ interface ReportLinkProps {
 const ReportLink: React.FC<ReportLinkProps> = ({ report, className = "" }) => {
   const handleDownload = () => {
     const reportFilename = report.path.split('/').pop();
-    window.open(`http://localhost:8000/api/reports/${reportFilename}`, '_blank');
+    window.open(`${import.meta.env.VITE_API_BASE_URL}/api/reports/${reportFilename}`, '_blank');
   };
 
   return (

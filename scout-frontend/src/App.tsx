@@ -60,7 +60,7 @@ function App() {
   useEffect(() => {
     const fetchCurrentReports = async () => {
       try {
-        const response = await fetch('http://localhost:8000/api/reports/list');
+        const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/reports/list`);
         if (response.ok) {
           const data = await response.json();
           setGeneratedReports(data.reports);
@@ -147,7 +147,7 @@ function App() {
     formData.append('file', file);
 
     try {
-      const response = await fetch('http://localhost:8000/api/upload', {
+      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/upload`, {
         method: 'POST',
         body: formData,
       });
@@ -175,7 +175,7 @@ function App() {
     setAttachedFile(null);
     setFileContext(null);
     try {
-      await fetch('http://localhost:8000/api/context/clear', { method: 'POST' });
+      await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/context/clear`, { method: 'POST' });
       console.log('Backend context cleared.');
     } catch (error) {
       console.error('Failed to clear backend context:', error);
@@ -202,7 +202,7 @@ function App() {
 
     
     try {
-      await fetch('http://localhost:8000/api/context/clear', { method: 'POST' });
+      await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/context/clear`, { method: 'POST' });
       console.log('Backend context cleared for new chat.');
     } catch (error) {
       console.error('Failed to clear backend context:', error);
@@ -221,7 +221,7 @@ function App() {
 
   const fetchTodoList = async () => {
     try {
-      const response = await fetch('http://localhost:8000/api/plan/todo');
+      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/plan/todo`);
       if (!response.ok) {
         throw new Error('Failed to fetch to-do list');
       }
@@ -269,7 +269,7 @@ function App() {
     setMessages((prev) => [...prev, aiMessage]);
 
     try {
-      const response = await fetch('http://localhost:8000/api/chat/stream', {
+      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/chat/stream`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

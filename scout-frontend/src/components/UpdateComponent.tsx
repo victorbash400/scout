@@ -27,7 +27,7 @@ const UpdateComponent: React.FC<UpdateComponentProps> = ({ onNewEvent, generated
     const eventsEndRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
-        const eventSource = new EventSource('http://localhost:8000/api/specialist/stream');
+        const eventSource = new EventSource(`${import.meta.env.VITE_API_BASE_URL}/api/specialist/stream`);
 
         eventSource.onmessage = (event) => {
             if (event.data.startsWith(':')) return; // Ignore keepalive pings

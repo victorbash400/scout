@@ -153,7 +153,7 @@ async def get_todo_list():
 async def chat_stream_endpoint(request: Dict[str, str]):
     """Stream chat with the Planner Agent"""
     message = request.get("message", "")
-    mode = request.get("mode", "chat")  # Default to chat mode
+    mode = request.get("mode", "chat")
     if not message:
         raise HTTPException(status_code=400, detail="Message required")
     
@@ -161,25 +161,34 @@ async def chat_stream_endpoint(request: Dict[str, str]):
     prefixed_message = mode_prefix + message
     
     async def generate_stream() -> AsyncGenerator[str, None]:
-        async for event in chat_with_planner_streaming(prefixed_message):
-            if 'event' in event:
-                event_data = event['event']
-                if 'contentBlockStart' in event_data:
-                    start_data = event_data.get('contentBlockStart', {}).get('start')
-                    if start_data and 'toolUse' in start_data:
-                        tool_use_data = start_data['toolUse']
-                        tool_name = tool_use_data.get('name')
-                        tool_use_id = tool_use_data.get('toolUseId')
-                        content_block_index = event_data.get('contentBlockStart', {}).get('contentBlockIndex')
-                        yield f"data: {json.dumps({'tool_start': {'tool_name': tool_name, 'tool_use_id': tool_use_id, 'content_block_index': content_block_index}})}\n\n"
-                elif 'contentBlockStop' in event_data:
-                    tool_use_id = event_data.get('contentBlockStop', {}).get('toolUseId') # Changed to get toolUseId
-                    content_block_index = event_data.get('contentBlockStop', {}).get('contentBlockIndex')
-                    yield f"data: {json.dumps({'tool_end': {'tool_use_id': tool_use_id, 'content_block_index': content_block_index}})}\n\n"
-                elif 'contentBlockDelta' in event_data:
-                    delta = event_data.get('contentBlockDelta', {}).get('delta')
-                    if delta and 'text' in delta:
-                        yield f"data: {json.dumps({'content': delta['text']})}\n\n"
+        logger.info(f"🔴 STREAM START - Message: {message[:100]}")  # ADD
+        try:
+            event_count = 0
+            async for event in chat_with_planner_streaming(prefixed_message):
+                event_count += 1
+                logger.info(f"🔴 EVENT #{event_count}: {str(event)[:200]}")  # ADD
+                if 'event' in event:
+                    event_data = event['event']
+                    if 'contentBlockStart' in event_data:
+                        start_data = event_data.get('contentBlockStart', {}).get('start')
+                        if start_data and 'toolUse' in start_data:
+                            tool_use_data = start_data['toolUse']
+                            tool_name = tool_use_data.get('name')
+                            tool_use_id = tool_use_data.get('toolUseId')
+                            content_block_index = event_data.get('contentBlockStart', {}).get('contentBlockIndex')
+                            yield f"data: {json.dumps({'tool_start': {'tool_name': tool_name, 'tool_use_id': tool_use_id, 'content_block_index': content_block_index}})}\n\n"
+                    elif 'contentBlockStop' in event_data:
+                        tool_use_id = event_data.get('contentBlockStop', {}).get('toolUseId')
+                        content_block_index = event_data.get('contentBlockStop', {}).get('contentBlockIndex')
+                        yield f"data: {json.dumps({'tool_end': {'tool_use_id': tool_use_id, 'content_block_index': content_block_index}})}\n\n"
+                    elif 'contentBlockDelta' in event_data:
+                        delta = event_data.get('contentBlockDelta', {}).get('delta')
+                        if delta and 'text' in delta:
+                            yield f"data: {json.dumps({'content': delta['text']})}\n\n"
+            logger.info(f"🔴 STREAM END - Total events: {event_count}")  # ADD
+        except Exception as e:
+            logger.error(f"🔴 STREAM ERROR: {e}", exc_info=True)  # ADD
+            yield f"data: {json.dumps({'error': str(e)})}\n\n"
         yield "data: [DONE]\n\n"
     
     return StreamingResponse(
@@ -189,6 +198,7 @@ async def chat_stream_endpoint(request: Dict[str, str]):
             "Cache-Control": "no-cache",
             "Connection": "keep-alive",
             "Content-Type": "text/event-stream",
+            "X-Accel-Buffering": "no",  # ADD - prevents nginx buffering
         }
     )
 
