@@ -1,22 +1,22 @@
 version: 1.0
 runtime: python311
 
-# This section is necessary to satisfy the App Runner parser, 
-# even if the commands are redundant (or removed). 
-# We'll use it to install the bare minimum here.
 build:
   commands:
     build:
-      - pip3 install -r scout-backend/requirements.txt # Install (for the parser's expected flow)
+      # 🚨 FIX: Path correction. It should just be the filename 
+      # since the container's WORKDIR is /app/scout-backend.
+      - pip3 install -r requirements.txt 
 
 run:
   runtime-version: 3.11
   
-  # This section is NECESSARY to make packages available in the runtime environment (fixing 'No module named uvicorn').
   pre-run:
-    - pip3 install -r scout-backend/requirements.txt # Re-install (for the runtime container)
+    # 🚨 FIX: Path correction. Must match the build step.
+    - pip3 install -r requirements.txt 
   
-  command: python3 -m uvicorn scout-backend.main:app --host 0.0.0.0 --port 8080
+  # Ensure the application module path is correct.
+  command: python3 -m uvicorn main:app --host 0.0.0.0 --port 8080 
   
   network:
     port: 8080
