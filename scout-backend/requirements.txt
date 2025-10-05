@@ -8,6 +8,7 @@ strands-agents-tools==0.2.7
 
 # Web Framework (pulls in starlette, uvicorn, etc.)
 fastapi==0.118.0
+uvicorn
 
 # PDF Processing
 PyPDF2==3.0.1
