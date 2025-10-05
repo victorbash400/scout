@@ -6,16 +6,17 @@ build:
       - pip3 install -r requirements.txt
       - pip3 install uvicorn
 
-
 run:
   runtime-version: 3.11
-  command: python3 -m uvicorn main:app --host 0.0.0.0 --port 8000
+  # ✅ Fix: Use package-style import (scout-backend.main:app)
+  # ✅ Fix: Change port to 8080
+  command: python3 -m uvicorn scout-backend.main:app --host 0.0.0.0 --port 8080 
   network:
-    port: 8000
+    port: 8080 # ✅ Change to 8080
     env: PORT
   env:
     - name: PORT
-      value: "8000"
+      value: "8080" # ✅ Change to 8080
     - name: AWS_REGION
       value: "eu-central-1"
     - name: STORAGE_BACKEND
