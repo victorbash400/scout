@@ -247,7 +247,7 @@ async def specialist_stream():
     async def event_generator():
         while True:
             try:
-                event: StreamEvent = await asyncio.wait_for(event_queue.get(), timeout=5)
+                event: StreamEvent = await asyncio.wait_for(event_queue.get(), timeout=2)
                 logger.info(f"Event received from queue: {event}")
                 # Fix: Handle both dict and Pydantic model
                 if isinstance(event, dict):
@@ -257,7 +257,18 @@ async def specialist_stream():
             except asyncio.TimeoutError:
                 # Send a keepalive comment every 5 seconds
                 yield ": keepalive\n\n"
-    return StreamingResponse(event_generator(), media_type="text/event-stream")
+    return StreamingResponse(
+        event_generator(), 
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache, no-store, must-revalidate",
+            "Connection": "keep-alive",
+            "Content-Type": "text/event-stream",
+            "X-Accel-Buffering": "no",
+            "Access-Control-Allow-Origin": "*",
+            "Keep-Alive": "timeout=30, max=100"
+        }
+    )
 
 @app.get("/api/reports/{report_name}")
 async def get_report_as_pdf(report_name: str):
