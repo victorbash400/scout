@@ -224,6 +224,8 @@ def set_planner_context(context: str):
 def clear_planner_context():
     """Clears the document context from the planner agent."""
     planner.document_context = None
+    # Clear conversation history/memory
+    planner.agent.messages = []
 
 def get_planner_todo_list():
     """Get the current to-do list from the planner agent."""

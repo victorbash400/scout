@@ -16,11 +16,11 @@ interface ChatBubbleProps {
   } | null;
 }
 
-const ChatBubble: React.FC<ChatBubbleProps> = ({ role, content, timestamp, tool_name, tool_input, tool_is_active, attachedFile }) => {
+const ChatBubble: React.FC<ChatBubbleProps> = ({ role, content, tool_name, tool_is_active, attachedFile }) => {
   // Extract file information if present in content
   let displayContent = content;
   let fileAttachment = attachedFile;
-  
+
   // Check if content starts with the file prefix pattern
   const filePrefixMatch = content.match(/^\(File: ([^\)]+)\) ?(.*)/);
   if (filePrefixMatch) {
@@ -44,7 +44,7 @@ const ChatBubble: React.FC<ChatBubbleProps> = ({ role, content, timestamp, tool_
               </div>
             </div>
           )}
-          <div className="text-white rounded-3xl px-5 py-3 shadow-sm" style={{backgroundColor: '#04331c'}}>
+          <div className="text-white rounded-3xl px-5 py-3 shadow-sm" style={{ backgroundColor: '#04331c' }}>
             <p className="text-sm leading-relaxed">{displayContent || " "}</p>
           </div>
         </div>
@@ -54,9 +54,9 @@ const ChatBubble: React.FC<ChatBubbleProps> = ({ role, content, timestamp, tool_
 
   if (tool_name) {
     return (
-        <div className="mb-8">
-            <ToolIndicator toolName={tool_name} isActive={tool_is_active} />
-        </div>
+      <div className="mb-8">
+        <ToolIndicator toolName={tool_name} isActive={tool_is_active || false} />
+      </div>
     );
   }
 

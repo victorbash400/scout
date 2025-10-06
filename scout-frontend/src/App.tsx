@@ -50,7 +50,7 @@ function App() {
   // New state for file handling
   const [attachedFile, setAttachedFile] = useState<File | null>(null);
   const [isProcessingFile, setIsProcessingFile] = useState(false);
-  const [fileContext, setFileContext] = useState<string | null>(null);
+  const [, setFileContext] = useState<string | null>(null);
 
   // State for generated reports
   const [generatedReports, setGeneratedReports] = useState<{name: string, path: string}[]>([]);
@@ -343,7 +343,7 @@ function App() {
                 
                 setActiveToolCalls(prev => new Set(prev).add(tool_use_id || ''));
               } else if (parsed.tool_end) {
-                const { tool_use_id, content_block_index } = parsed.tool_end;
+                const { tool_use_id } = parsed.tool_end;
                 
                 const startMessage = messages.find(msg => msg.tool_use_id === tool_use_id);
                 if (startMessage && startMessage.tool_name === 'execute_research_plan') {

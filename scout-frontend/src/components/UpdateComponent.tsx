@@ -53,7 +53,7 @@ const UpdateComponent: React.FC<UpdateComponentProps> = ({ onNewEvent, generated
         eventsEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }, [events]);
 
-    const renderEvent = (event: StreamEvent, index: number) => {
+    const renderEvent = (event: StreamEvent, _index: number) => {
         const isProgressEvent = event.eventType === 'tool_call' && event.payload.tool_name === 'update_work_progress' && event.payload.display_message;
         // Find all progress events for vertical line
         const progressEvents = events.filter(e => e.eventType === 'tool_call' && e.payload.tool_name === 'update_work_progress' && e.payload.display_message);
