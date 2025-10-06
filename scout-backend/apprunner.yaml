@@ -1,30 +1,38 @@
 version: 1.0
 runtime: python311
-
 build:
   commands:
     build:
-      # 🚨 FIX: Path correction. It should just be the filename 
-      # since the container's WORKDIR is /app/scout-backend.
       - pip3 install -r requirements.txt 
 
 run:
   runtime-version: 3.11
   
   pre-run:
-    # 🚨 FIX: Path correction. Must match the build step.
     - pip3 install -r requirements.txt 
   
-  # Ensure the application module path is correct.
   command: python3 -m uvicorn main:app --host 0.0.0.0 --port 8080 
   
   network:
     port: 8080
     env: PORT
+    
   env:
     - name: PORT
       value: "8080"
     - name: AWS_REGION
-      value: "eu-central-1"
+      value: "eu-north-1"  
     - name: STORAGE_BACKEND
       value: "local"
+  
+  secrets:
+    - name: AWS_ACCESS_KEY_ID
+      value-from: "arn:aws:secretsmanager:eu-central-1:547688237843:secret:Scout_access-ldp6Ub:AWS_ACCESS_KEY_ID::"
+    - name: AWS_SECRET_ACCESS_KEY
+      value-from: "arn:aws:secretsmanager:eu-central-1:547688237843:secret:Scout_access-ldp6Ub:AWS_SECRET_ACCESS_KEY::"
+    - name: TAVILY_API_KEY
+      value-from: "arn:aws:secretsmanager:eu-central-1:547688237843:secret:Scout_access-ldp6Ub:TAVILY_API_KEY::"
+    - name: GOOGLE_PLACES_API_KEY
+      value-from: "arn:aws:secretsmanager:eu-central-1:547688237843:secret:Scout_access-ldp6Ub:GOOGLE_PLACES_API_KEY::"
+    - name: PERPLEXITY_API_KEY
+      value-from: "arn:aws:secretsmanager:eu-central-1:547688237843:secret:Scout_access-ldp6Ub:PERPLEXITY_API_KEY::"
