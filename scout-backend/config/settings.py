@@ -46,7 +46,7 @@ class Settings(BaseSettings):
     # API Configuration
     api_host: str = "0.0.0.0"
     api_port: int = 8000
-    cors_origins: list = ["http://localhost:3000", "http://localhost:5173", "https://scout-agent.vercel.app"]
+    cors_origins: list = ["http://localhost:3000", "http://localhost:5173", "https://scout-agent.vercel.app", "https://scout-lovat.vercel.app"]
 
     # Storage Configuration
     storage_backend: str = "local" # 'local' or 's3'
