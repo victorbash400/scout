@@ -21,9 +21,6 @@ interface Message {
 interface TodoList {
   competition_tasks: string[];
   market_tasks: string[];
-  financial_tasks: string[];
-  risk_tasks: string[];
-  synthesis_requirements: string[];
   price_tasks: string[];
   legal_tasks: string[];
 }

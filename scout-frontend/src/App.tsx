@@ -23,9 +23,6 @@ interface Message {
 interface TodoList {
   competition_tasks: string[];
   market_tasks: string[];
-  financial_tasks: string[];
-  risk_tasks: string[];
-  synthesis_requirements: string[];
   price_tasks: string[];
   legal_tasks: string[];
 }
@@ -53,7 +50,7 @@ function App() {
   const [, setFileContext] = useState<string | null>(null);
 
   // State for generated reports
-  const [generatedReports, setGeneratedReports] = useState<{name: string, path: string}[]>([]);
+  const [generatedReports, setGeneratedReports] = useState<{ name: string, path: string }[]>([]);
   const [pendingSaveToolCalls, setPendingSaveToolCalls] = useState<Record<string, string>>({});
 
   // Fetch current reports from backend (less frequent polling to reduce logs)
@@ -71,10 +68,10 @@ function App() {
     };
 
     fetchCurrentReports();
-    
+
     // Set up interval to periodically fetch updated reports (every 10 seconds instead of 3)
     const intervalId = setInterval(fetchCurrentReports, 10000);
-    
+
     return () => clearInterval(intervalId);
   }, []);
 
@@ -107,12 +104,12 @@ function App() {
         }
 
         if (filePath) {
-            setGeneratedReports(prevReports => {
-              if (!prevReports.some(report => report.path === filePath)) {
-                return [...prevReports, { name: formattedName, path: filePath }];
-              }
-              return prevReports;
-            });
+          setGeneratedReports(prevReports => {
+            if (!prevReports.some(report => report.path === filePath)) {
+              return [...prevReports, { name: formattedName, path: filePath }];
+            }
+            return prevReports;
+          });
         }
 
         // Clean up the pending call
@@ -129,7 +126,7 @@ function App() {
   useEffect(() => {
     const initialChatId = generateChatId();
     setCurrentChatId(initialChatId);
-    
+
     const initialSession: ChatSession = {
       id: initialChatId,
       messages: [],
@@ -188,7 +185,7 @@ function App() {
 
   const startNewChat = async () => {
     if (currentChatId && messages.length > 0) {
-      const updatedSessions = chatSessions.map(session => 
+      const updatedSessions = chatSessions.map(session =>
         session.id === currentChatId ? { ...session, messages } : session
       );
       setChatSessions(updatedSessions);
@@ -200,7 +197,7 @@ function App() {
     setHasStarted(false);
     setTodoList(null);
 
-    
+
     try {
       await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/context/clear`, { method: 'POST' });
       console.log('Backend context cleared for new chat.');
@@ -210,7 +207,7 @@ function App() {
 
     const newChatId = generateChatId();
     setCurrentChatId(newChatId);
-    
+
     const newSession: ChatSession = {
       id: newChatId,
       messages: [],
@@ -243,7 +240,7 @@ function App() {
     if (!hasStarted) {
       setHasStarted(true);
     }
-    
+
     setIsLoading(true);
 
     let messageToSend = content;
@@ -312,7 +309,7 @@ function App() {
               }
               break;
             }
-            
+
             try {
               const parsed = JSON.parse(data);
               if (parsed.content) {
@@ -340,11 +337,11 @@ function App() {
                   timestamp: new Date().toLocaleTimeString(),
                 };
                 setMessages((prev) => [...prev, toolMessage]);
-                
+
                 setActiveToolCalls(prev => new Set(prev).add(tool_use_id || ''));
               } else if (parsed.tool_end) {
                 const { tool_use_id } = parsed.tool_end;
-                
+
                 const startMessage = messages.find(msg => msg.tool_use_id === tool_use_id);
                 if (startMessage && startMessage.tool_name === 'execute_research_plan') {
                   setIsExecutingPlan(false);
@@ -358,13 +355,13 @@ function App() {
                     return msg;
                   })
                 );
-                
+
                 setActiveToolCalls(prev => {
                   const newSet = new Set(prev);
                   newSet.delete(tool_use_id || '');
                   return newSet;
                 });
-                
+
                 if (mode === 'agent') {
                   fetchTodoList();
                 }
@@ -403,8 +400,8 @@ function App() {
 
   if (!hasStarted) {
     return (
-      <div 
-        className="h-screen flex flex-col items-center justify-center relative" 
+      <div
+        className="h-screen flex flex-col items-center justify-center relative"
         style={{
           backgroundImage: `url(${welcomeImage})`,
           backgroundSize: 'cover',
@@ -427,14 +424,14 @@ function App() {
   }
 
   return (
-    <div className="h-screen relative" style={{backgroundColor: '#fdfdf1'}}>
+    <div className="h-screen relative" style={{ backgroundColor: '#fdfdf1' }}>
       <div className="absolute top-6 left-6 flex items-center gap-3 z-30">
         <img src="/scout-favicon.svg" alt="Scout" className="w-6 h-6" />
         <h1 className="text-2xl font-light text-gray-800">Scout</h1>
       </div>
-      
+
       <Sidebar onNewChat={startNewChat} />
-      <ChatSection 
+      <ChatSection
         messages={messages}
         isLoading={isLoading}
         onSendMessage={handleSendMessage}

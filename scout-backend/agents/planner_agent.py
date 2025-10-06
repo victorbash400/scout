@@ -243,9 +243,8 @@ def clear_planner_todo_list():
     todo_list_storage = {
         "competition_tasks": [],
         "market_tasks": [],
-        "financial_tasks": [],
-        "risk_tasks": [],
-        "synthesis_requirements": []
+        "price_tasks": [],
+        "legal_tasks": []
     }
     clear_report_filepaths()
 
